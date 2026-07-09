@@ -176,10 +176,16 @@ function closeModal() {
   setTimeout(pump, 60);
 }
 
+// Escenas de interfaz en espera (p.ej. la convalecencia tras un combate):
+// jamás pisan un modal abierto — esperan su turno en la cola.
+let uiQueue = [];
+function queueScene(sc) { uiQueue.push(sc); }
+
 // La cola del Director: eventos pendientes se muestran cuando hay calma.
 export function pump() {
   if (!S.G || CB.C) return;
   if (!$('modalWrap').classList.contains('hidden')) return;
+  if (uiQueue.length) { showScene(uiQueue.shift(), () => {}); return; }
   if (!S.G.pending.length) return;
   const raw = S.G.pending.shift();
   const [id, arg] = raw.split(':');
@@ -424,6 +430,7 @@ function banda() {
     const w = c.gear.weapon;
     const rec = c.recoverUntil && g.time.day < c.recoverUntil;
     html += `<div class="card" data-ch="${c.id}" style="cursor:pointer">
+      ${c.portrait ? `<img class="mini" src="${c.portrait}" onerror="this.remove()">` : ''}
       <div class="title">${c.name}${c.alias ? ' «' + c.alias + '»' : ''} ${isP ? '· TÚ' : ''}</div>
       <div class="row"><span>${c.role} · ${ageOf(c)} años</span><span>${describeHp(c.hp, c.hpMax)}${rec ? ' · convaleciente' : ''}</span></div>
       <div class="row"><span class="dim">${w ? WEAPONS[w.def].name + (w.broken ? ' (ROTA)' : ` · ${w.dur}%`) : 'desarmado'}</span>
@@ -442,6 +449,7 @@ function charDetail(id) {
   if (!c || !c.alive) { detailChar = null; renderAll(); return; }
   const isP = c.id === g.player;
   let html = `<button data-back="1">← Volver a la banda</button>
+    ${c.portrait ? `<img class="bigface" src="${c.portrait}" onerror="this.remove()">` : ''}
     <h2 style="margin-top:10px">${c.name}${c.alias ? ' «' + c.alias + '»' : ''}</h2>
     <div class="flavor">${c.role} · ${ageOf(c)} años · ${describeHp(c.hp, c.hpMax)} (${c.hp}/${c.hpMax})</div>
     <div class="panel">`;
@@ -682,15 +690,17 @@ function showIntim() {
 
 function afterCombat() {
   // Si el protagonista quedó fuera mucho tiempo, el mundo siguió: nárralo.
+  // OJO: en cola, nunca directamente — podría pisar una escena de historia
+  // abierta por el onEnd del combate (p.ej. el entierro de Sam).
   const p = player();
   if (p && p.recoverUntil && p.recoverUntil > S.G.time.day) {
     const days = p.recoverUntil - S.G.time.day;
     T.advanceDays(days, { rest: true });
-    showScene({
+    queueScene({
       title: 'Los días perdidos',
       text: `Fiebre, vendas, caras que entran y salen del catre. ${days} días se caen del calendario como páginas arrancadas.\n\nCuando por fin te sostienen las piernas, el espejo te devuelve a alguien un poco más parecido a Sam. No sabes si eso te gusta.`,
       opts: [{ t: 'Volver a la mesa' }]
-    }, () => {});
+    });
   }
   pump();
 }

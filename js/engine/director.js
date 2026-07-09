@@ -40,6 +40,11 @@ export function dailyTick() {
     G.flags.dawson = 1;
     queueEvent('rumor_dawson');
   }
+
+  // Telón de temporada: contenido de autor agotado → avisar, no adelgazar.
+  if (!onceDone('fin_temporada') && G.flags.dawson === 3 && G.stats.jobs >= 25) {
+    queueEvent('fin_temporada');
+  }
 }
 
 // En los caminos vive lo imposible. Probabilidad ínfima a propósito:

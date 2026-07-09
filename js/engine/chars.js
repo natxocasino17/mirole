@@ -47,7 +47,8 @@ export function makeEli() {
     hp: 7, hpMax: 7,
     skills: { punteria: 45, reflejos: 32, voluntad: 72, vigor: 52, labia: 55, sigilo: 20 },
     traits: ['fe rota'], loyalty: 55, salario: 10,
-    gear: { weapon: mkWeapon('recortada'), blanca: mkWeapon('navaja') }
+    gear: { weapon: mkWeapon('recortada'), blanca: mkWeapon('navaja') },
+    portrait: 'assets/portraits/eli.png'
   });
   eli.gear.weapon.customName = '«La Viuda»';
   return eli;
@@ -69,6 +70,10 @@ export function genRecruit() {
   });
   r.hpMax = r.hp;
   r.salario = 6 + Math.floor((r.skills.punteria + r.skills.reflejos) / 20);
+  // Retratos por convención: sube assets/portraits/recruit_1.png … _8.png
+  // con nano banana y las caras aparecen solas. Si falta el archivo, la
+  // interfaz muestra un emoji y no pasa nada.
+  r.portrait = `assets/portraits/recruit_${rint(1, 8)}.png`;
   // La traición nunca es aleatoria: nace de un secreto que siempre estuvo ahí.
   if (chance(0.25)) r.secret = pick(SECRETS);
   return r;

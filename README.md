@@ -48,6 +48,16 @@ sin internet** (en el avión, en el baño, en 2060).
 - El juego está pensado para sesiones de 10–60 minutos. Entra, vive un poco,
   guarda y vete. El territorio espera.
 
+## Retratos de personajes (opcional, por convención de nombres)
+
+Genera pixel art (mismo estilo que `assets/portraits/vane.png`: fondo gris
+carbón, luz ámbar) y súbelo con estos nombres exactos — el juego los usa
+solo, sin tocar código. Si falta un archivo, no pasa nada:
+
+- `assets/portraits/eli.png` — Eli Marsh, el Diácono
+- `assets/portraits/recruit_1.png` … `recruit_8.png` — banco de caras para
+  reclutas generados (haz 8 variadas: hombres, mujeres, edades)
+
 ## ⚠️ NO ABRAS `docs/world-bible.b64`
 
 Ese archivo contiene la biblia secreta del mundo: lo que va a pasar, por qué,

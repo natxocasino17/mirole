@@ -260,6 +260,20 @@ export const EVENTS = {
     }
   },
 
+  // El telón de la Temporada 1: cuando el contenido de autor se agota,
+  // el juego lo dice claro en vez de dejar que el mundo se adelgace.
+  fin_temporada: {
+    once: true,
+    build() {
+      journal('Fin de la Temporada 1. El territorio pide capítulos nuevos. La historia continúa cuando su dueño quiera.');
+      return {
+        title: '🌵 FIN DE LA TEMPORADA 1',
+        text: 'Has cerrado el hilo de Dawson, el tablón se repite y conoces cada cara de Marrow Creek. El motor del juego seguirá generando trabajos, traiciones y días — para siempre — pero la HISTORIA de autor de esta temporada está completa.\n\nPara continuar la saga: abre una sesión de Claude Code sobre el repo «mirole» y dile:\n\n«Decodifica docs/world-bible.b64 en silencio, sin mostrármela. Aquí está mi partida extraída (MENÚ → Extraer). Lee mis flags, mi cementerio y mi diario, y escribe la Temporada 2 como archivos nuevos en js/data/ sin romper mi guardado. Actualiza la biblia. Sorpréndeme.»\n\nMientras tanto, el territorio sigue siendo tuyo: prospera, entierra, prospera otra vez.',
+        opts: [{ t: 'El territorio es mío' }]
+      };
+    }
+  },
+
   mientras_fuera: {
     build() {
       const lines = [
