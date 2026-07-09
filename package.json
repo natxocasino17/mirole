@@ -1,0 +1,7 @@
+{
+  "name": "mirole",
+  "version": "0.1.0",
+  "description": "MIROLE — un western personal. Un juego para toda una vida.",
+  "private": true,
+  "type": "module"
+}
