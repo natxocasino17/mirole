@@ -3,10 +3,10 @@
 // secuelas permanentes, edad que pasa factura, y secretos que un día
 // pueden costarte caro. El arco de mejora es largo: de don nadie a
 // leyenda hay años, no semanas.
-import { G, log, journal, yearOf } from './state.js';
+import { G, log, journal, yearOf, queueEvent } from './state.js';
 import { rint, pick, chance } from './rng.js';
 import { mkWeapon, ROPA } from '../data/items.js';
-import { FIRST, LAST, APODOS, TRAITS, SECRETS } from '../data/names.js';
+import { FIRST, LAST, APODOS, TRAITS, SECRETS, BIO_ORIGIN, BIO_WOUND, BIO_QUIRK } from '../data/names.js';
 
 export const SKILLS = ['punteria', 'reflejos', 'voluntad', 'vigor', 'labia', 'sigilo'];
 export const SKILL_NAMES = {
@@ -78,6 +78,10 @@ export function genRecruit() {
   r.portrait = `assets/portraits/recruit_${rint(1, 8)}.png`;
   // La traición nunca es aleatoria: nace de un secreto que siempre estuvo ahí.
   if (chance(0.25)) r.secret = pick(SECRETS);
+  // Cada recluta es una novela corta: origen, herida y manía.
+  // Se descubren hablando, no leyendo fichas.
+  r.bio = [pick(BIO_ORIGIN), pick(BIO_WOUND), pick(BIO_QUIRK)];
+  r.bioKnown = 0;
   return r;
 }
 
@@ -170,4 +174,10 @@ export function buryChar(ch, cause, epitaph) {
     cause, epitaph: epitaph || '', day: G.time.day
   });
   journal(`Hoy hemos enterrado a ${ch.name}${ch.alias ? ' «' + ch.alias + '»' : ''}. ${cause}.`);
+  // Si era de la mesa, se le despide como se debe: el funeral llega
+  // en cuanto se asiente el polvo.
+  if (ch.id && G.chars[ch.id]) {
+    G.flags.funeralFor = { name: ch.name, alias: ch.alias, bio: ch.bio || [], trait: (ch.traits || [])[0] || '' };
+    queueEvent('funeral');
+  }
 }

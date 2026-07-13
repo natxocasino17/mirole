@@ -9,6 +9,8 @@ import * as PK from '../engine/poker.js';
 import * as D from '../engine/director.js';
 import { EVENTS } from '../data/events.js';
 import { SIDEQUESTS } from '../data/sidequests.js';
+import { TOMO1 } from '../data/tomo1.js';
+import { otisLine, fitchLine, quillLine, curlyLine } from '../data/npcs.js';
 import { WEAPONS, GOODS, ROPA, UPGRADES, HORSES, SHOP_ALMACEN, SHOP_ARMERO, SHOP_SASTRE,
          mkWeapon, mkGood, mkRopa, itemName, itemDef, effAcc, effMag, effJam, effDurMax } from '../data/items.js';
 import { HERO_NAMES } from '../data/names.js';
@@ -116,7 +118,7 @@ export function renderAll() {
 
 function resetDaily() {
   if (S.G.daily.day !== S.G.time.day) {
-    S.G.daily = { day: S.G.time.day, whisky: 0, talks: [], clean: false, rumor: false, pet: false };
+    S.G.daily = { day: S.G.time.day, whisky: 0, talks: [], clean: false, rumor: false, pet: false, otis: false };
   }
 }
 
@@ -213,6 +215,7 @@ function cantina() {
   html += `<button data-a="poker" ${g.money < 5 ? 'disabled' : ''}>🃏 Póker<br><span class="dim small">Cinco cartas contra la casa.</span></button>`;
   html += `<button data-a="clean" ${g.daily.clean ? 'disabled' : ''}>🔧 Limpiar armas<br><span class="dim small">+6 estado a todos los hierros.</span></button>`;
   html += `<button data-a="rumor" ${g.daily.rumor || g.money < 2 ? 'disabled' : ''}>👂 Rumores ($2)<br><span class="dim small">Invita a alguien. Escucha.</span></button>`;
+  html += `<button data-a="otis" ${g.daily.otis ? 'disabled' : ''}>🍺 Charlar con Otis<br><span class="dim small">El tabernero lo sabe casi todo.</span></button>`;
   for (const c of squad) {
     const done = g.daily.talks.includes(c.id);
     html += `<button data-a="talk" data-id="${c.id}" ${done ? 'disabled' : ''}>💬 Hablar con ${c.alias || c.name}<br><span class="dim small">${done ? 'Ya hablasteis hoy.' : 'Lealtad ' + c.loyalty}</span></button>`;
@@ -253,6 +256,10 @@ function cantinaAct(d) {
     g.money -= 2; g.daily.rumor = true;
     S.log('Rumor: ' + pick(RUMORS));
   }
+  if (d.a === 'otis') {
+    g.daily.otis = true;
+    showScene({ title: 'Otis, «El Cuervo»', text: otisLine() }, () => {});
+  }
   if (d.a === 'talk') talk(+d.id);
   if (d.a === 'pet') {
     g.daily.pet = true;
@@ -272,6 +279,10 @@ function talk(id) {
   if (c.name === 'Eli Marsh') {
     const tiers = ELI_TALKS.filter(t => c.loyalty >= t.min);
     line = pick(tiers[tiers.length - 1].lines);
+  } else if (c.bio && c.bioKnown < 3 && c.loyalty >= 40 && chance(0.6)) {
+    // La confianza abre la novela corta que cada uno lleva dentro.
+    line = `Baja la voz, gira el vaso, y te cuenta algo de verdad: ${c.bio[c.bioKnown]}.`;
+    c.bioKnown++;
   } else {
     const pool = c.loyalty >= 75 ? RECRUIT_TALKS.high : c.loyalty >= 50 ? RECRUIT_TALKS.mid : RECRUIT_TALKS.low;
     line = pick(pool);
@@ -354,6 +365,14 @@ function mapa() {
   if (mapaView) { renderShop(mapaView); return; }
   let html = `<h2>🗺️ MARROW CREEK</h2><div class="flavor">${S.dateStr()} · Barro, tablones y oportunidades feas.</div>`;
 
+  // La novela por entregas: el capítulo del Tomo, si espera
+  if (g.flags.t1 && TOMO1[g.flags.t1]) {
+    const cap = TOMO1[g.flags.t1];
+    html += `<div class="card special"><div class="title">📖 Capítulo ${g.flags.t1} — ${cap.title}</div>
+      <div class="small">TOMO I: «Todos los caminos cobran peaje». La historia principal. Sin prisa: los capítulos no caducan.</div>
+      <div class="row"><span class="dim">historia principal</span><button data-cap="1">Vivirlo</button></div></div>`;
+  }
+
   // El hilo principal
   if (g.flags.dawson === 2) {
     html += `<div class="card special"><div class="title">★ La pista de Dawson</div>
@@ -407,6 +426,11 @@ function mapa() {
     const w = g.wanted.find(x => x.id === +b.dataset.wanted);
     if (w) JB.startWanted(w, showScene);
   });
+  const capBtn = $('screen').querySelector('button[data-cap]');
+  if (capBtn) capBtn.onclick = () => {
+    const cap = TOMO1[g.flags.t1];
+    if (cap) cap.run(showScene);
+  };
   const dawsonBtn = $('screen').querySelector('button[data-dawson]');
   if (dawsonBtn) dawsonBtn.onclick = () => {
     g.flags.dawson = 2.5;
@@ -455,7 +479,7 @@ function renderShop(view) {
   }
 
   if (view === 'armero') {
-    html = shopHeader('🔧 ARMERÍA DE FITCH', 'Fitch habla poco y engrasa mucho. Sus precios muerden; su trabajo, jamás.');
+    html = shopHeader('🔧 ARMERÍA DE FITCH', fitchLine());
     html += `<h3>Comprar hierros</h3><div class="grid">`;
     for (const id of SHOP_ARMERO) {
       const d = WEAPONS[id];
@@ -497,7 +521,7 @@ function renderShop(view) {
   }
 
   if (view === 'sastre') {
-    html = shopHeader('🎩 SASTRERÍA QUILL', '«La ropa no hace al hombre», dice Quill, «pero decide quién dispara primero en las presentaciones.»');
+    html = shopHeader('🎩 SASTRERÍA QUILL', quillLine());
     html += `<div class="grid">`;
     for (const id of SHOP_SASTRE) {
       const d = ROPA[id];
@@ -508,7 +532,7 @@ function renderShop(view) {
   }
 
   if (view === 'establo') {
-    html = shopHeader('🐎 EL ESTABLO', 'Heno, moscas y la mejor conversación del pueblo: la que no habla.');
+    html = shopHeader('🐎 EL ESTABLO', curlyLine());
     if (g.horse) {
       html += `<div class="card"><div class="title">🐎 ${g.horse.name}</div>
         <div class="small">${HORSES[g.horse.def].name} · come $${g.horse.tier}/semana</div>
@@ -636,6 +660,9 @@ function charDetail(id) {
     html += `<div class="skillbar"><b>${SKILL_NAMES[sk]}</b><div class="bar"><i style="width:${c.skills[sk]}%"></i></div><em>${c.skills[sk]}</em><span class="dim small">${xp}/${need}</span></div>`;
   }
   html += `</div>`;
+  if (c.bio && c.bioKnown > 0) {
+    html += `<h3>Su historia</h3><div class="panel small">${c.bio.slice(0, c.bioKnown).map(b => '· ' + cap0(b)).join('<br>')}${c.bioKnown < 3 ? '<br><span class="dim">(hay más: sigue hablando con él en la cantina)</span>' : ''}</div>`;
+  }
   const traumaTxt = c.traits.map(t => {
     const tr = TRAUMAS.find(x => x.id === t);
     return tr ? `${tr.name} — ${tr.desc}` : t;
@@ -898,6 +925,8 @@ function renderCombat() {
     if (a === 'pay') CB.actPay();
   });
 }
+
+function cap0(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 
 function showIntim() {
   showScene({

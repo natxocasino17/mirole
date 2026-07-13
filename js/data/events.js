@@ -353,6 +353,93 @@ export const EVENTS = {
     }
   },
 
+  // El siguiente capítulo del Tomo llama a la puerta.
+  capitulo: {
+    build() {
+      return {
+        title: '📖 La historia continúa',
+        text: 'Lo notas en el aire antes que en los hechos: una carta, un rumor, una pluma donde no debería. El siguiente capítulo de tu historia te espera en el MAPA, marcado con 📖.\n\nLos capítulos no caducan. Pero tampoco esperan haciendo nada: el mundo se mueve mientras decides.',
+        opts: [{ t: 'Que venga lo que venga' }]
+      };
+    }
+  },
+
+  // El funeral: cuando muere uno de los tuyos, se le despide como se debe.
+  funeral: {
+    build() {
+      const f = G.flags.funeralFor;
+      if (!f) return null;
+      G.flags.funeralFor = null;
+      const bioLine = f.bio && f.bio.length ? `Sabías de ${f.alias || f.name} que ${pick(f.bio)}.` : '';
+      const eli = aliveSquad().find(c => c.name === 'Eli Marsh');
+      return {
+        title: `⚰️ El entierro de ${f.alias || f.name}`,
+        text: `Cavar la tumba de alguien de tu mesa es un oficio que no mejora con la práctica.\n\n${bioLine} Ahora todo eso — lo contado y lo que nunca llegó a contar — cabe en dos metros de tierra del cementerio de Marrow Creek.\n\n${eli ? 'Eli se pone el alzacuellos que ya no usa. Solo para esto se lo pone.' : 'No hay predicador. Habrá que arreglarse con lo que uno cargue dentro.'}\n\n¿Cómo lo despides?`,
+        opts: [
+          { t: 'Enterrarlo con su hierro al cinto', fx() {
+              for (const c of aliveSquad()) if (c.id !== G.player) c.loyalty = Math.min(100, c.loyalty + 4);
+              G.rep.humanidad = Math.min(100, G.rep.humanidad + 2);
+              journal(`Enterramos a ${f.name} con su arma puesta, como a los de antes. La banda entera echó su palada. Nadie tuvo prisa.`);
+              return 'El arma va con él: en este territorio, mandar a alguien desarmado a donde sea que se va es de mala educación.\n\nCada uno de la banda echa su palada. La lealtad no se compra, pero se entierra junta.\n\n(+4 lealtad a toda la banda)';
+            } },
+          { t: eli ? 'Pedirle a Eli las palabras' : 'Decir tú unas palabras torpes', fx() {
+              for (const c of aliveSquad()) c.stress = Math.max(0, c.stress - 6);
+              journal(`${eli ? 'Eli habló' : 'Hablé'} sobre la tumba de ${f.name}. Palabras sencillas. Las grandes no hacían falta: los muertos de casa se despiden bajito.`);
+              return eli
+                ? '«No voy a mentir sobre este hombre», empieza Eli, «porque los muertos huelen la mentira desde muy hondo.» Y entonces cuenta dos verdades y un chiste, y la gente llora en el chiste, que es como se debe llorar a los buenos.\n\n(−6 estrés a todos)'
+                : 'Hablas poco y torcido, y justo por eso, bien. Los funerales buenos son los que se quedan cortos.\n\n(−6 estrés a todos)';
+            } },
+          { t: 'Whisky sobre la tumba y silencio', fx() {
+              addStress(player(), -8);
+              journal(`Sobre la tumba de ${f.name}: medio whisky derramado, medio bebido, y todo el silencio del territorio. Hay idiomas que solo hablamos los que quedamos.`);
+              return 'Viertes la mitad en la tierra y te bebes la otra mitad, y en algún sitio — estás casi seguro — alguien acepta el trago.\n\nEl silencio de después dura lo que tiene que durar. Nadie lo rompe. Para eso están los amigos: para callarse juntos a tiempo.';
+            } }
+        ]
+      };
+    }
+  },
+
+  // 🎪 Día de feria: cada dos semanas, el pueblo se permite estar vivo.
+  feria: {
+    build() {
+      const p = player();
+      const opts = [
+        { t: 'Concurso de tiro ($5)', fx() {
+            if (G.money < 5) return 'Te palpas los bolsillos delante de la mesa de inscripción. El del lápiz tacha tu nombre con más fuerza de la necesaria.';
+            G.money -= 5;
+            addXp(p, 'punteria', 4);
+            if (p.skills.punteria + rint(0, 30) >= 55) {
+              G.money += 25; G.stats.earned += 25;
+              G.rep.fama = Math.min(100, G.rep.fama + 2);
+              return 'Seis botellas, seis platos y una veleta al vuelo. Tu revólver escribe tu nombre en el aire.\n\nEl premio: $25, un aplauso de pueblo entero y el rencor deportivo del herrero, campeón saliente. (+2 FAMA)';
+            }
+            return 'Cinco de seis. La sexta botella sigue entera y el herrero sigue campeón. Te aplaude con una sola mano, el muy artista.\n\n(La práctica cuenta: +XP de puntería)';
+          } },
+        { t: 'Feria tranquila: pastel, música y banda ($3)', fx() {
+            if (G.money < 3) return 'Ni para pastel. Miras la feria desde la cerca, que también es un plan, pero más triste.';
+            G.money -= 3;
+            for (const c of aliveSquad()) c.stress = Math.max(0, c.stress - 8);
+            return 'Pastel de manzana, un violinista medio bueno y la banda entera riéndose de nada, que es de lo que mejor se ríe.\n\nPor una tarde, nadie limpia un arma. (−8 estrés a todos)';
+          } }
+      ];
+      if (G.horse) opts.push({ t: `Carrera de caballos con ${G.horse.name} ($5)`, fx() {
+          if (G.money < 5) return 'La inscripción cuesta $5 que no tienes. Tu caballo te mira con reproche deportivo.';
+          G.money -= 5;
+          addXp(p, 'reflejos', 3);
+          if (G.horse.tier * 12 + p.skills.reflejos * 0.4 + rint(0, 30) >= 50) {
+            G.money += 20; G.stats.earned += 20;
+            return `${G.horse.name} corre como si le debieran dinero. Cruzáis la meta con medio cuerpo de ventaja y el pueblo en pie.\n\n$20 y una escarapela que ${G.horse.name} intenta comerse de inmediato.`;
+          }
+          return `Tercer puesto. ${G.horse.name} culpa al jinete con una elocuencia que no necesita palabras. Puede que tenga razón.`;
+        } });
+      return {
+        title: '🎪 Día de feria en Marrow Creek',
+        text: 'Banderines de colores cansados, un violinista, pasteles de verdad y el pueblo entero fingiendo por un día que el territorio es amable.\n\nHasta el sheriff sonríe. Da un poco de miedo, la verdad.\n\n¿Qué haces con la tarde?',
+        opts
+      };
+    }
+  },
+
   // El pregón de las historias únicas: avisa de que hay algo en el MAPA.
   rumor_historia: {
     build() {

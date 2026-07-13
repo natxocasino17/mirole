@@ -10,7 +10,9 @@ export const FOES = {
   matarife:  { name: 'Matarife',           hp: 6, punteria: 35, reflejos: 40, voluntad: 50, weapon: 'recortada',    loot: [4, 12] },
   veterano:  { name: 'Forajido veterano',  hp: 6, punteria: 52, reflejos: 48, voluntad: 62, weapon: 'winchester',   loot: [8, 20] },
   perro:     { name: 'Perro de presa',     hp: 3, punteria: 40, reflejos: 60, voluntad: 25, weapon: 'colmillos',    loot: [0, 0] },
-  palido:    { name: 'El Forastero Pálido', hp: 8, punteria: 72, reflejos: 65, voluntad: 95, weapon: 'el_juez',     loot: [0, 0] }
+  palido:    { name: 'El Forastero Pálido', hp: 8, punteria: 72, reflejos: 65, voluntad: 95, weapon: 'el_juez',     loot: [0, 0] },
+  cuervo:    { name: 'Cuervo Rojo',         hp: 5, punteria: 44, reflejos: 46, voluntad: 55, weapon: 'colt_saa',    loot: [4, 12] },
+  grey:      { name: 'Ezekiel Grey',        hp: 8, punteria: 60, reflejos: 50, voluntad: 92, weapon: 'winchester',  loot: [0, 0] }
 };
 
 export function mkFoe(id, name) {

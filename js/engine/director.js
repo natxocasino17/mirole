@@ -6,11 +6,18 @@ import { G, queueEvent, onceDone } from './state.js';
 import { chance, pick } from './rng.js';
 import { aliveSquad, player } from './chars.js';
 import { DAILY_POOL, MYTHIC_POOL, EVENTS } from '../data/events.js';
-import { pickSideQuest, SIDEQUESTS } from '../data/sidequests.js';
+import { pickSideQuest } from '../data/sidequests.js';
+import { tomo1Check } from '../data/tomo1.js';
 
 export function dailyTick() {
   const p = player();
   if (!p) return;
+
+  // La novela avanza: ¿toca capítulo nuevo?
+  tomo1Check();
+
+  // 🎪 Cada dos semanas, el pueblo respira: día de feria.
+  if (G.time.day % 14 === 0) queueEvent('feria');
 
   // Crisis interior: el estrés alto engendra pesadillas.
   if (p.stress >= 85) queueEvent('pesadilla');
