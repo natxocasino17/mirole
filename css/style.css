@@ -166,6 +166,48 @@ label{font-size:12px; color:var(--dim); display:block; margin:8px 0 3px; text-al
 .card img.mini{width:48px; height:48px; object-fit:cover; float:right; border:2px solid var(--line); margin-left:8px;}
 img.bigface{width:110px; height:110px; object-fit:cover; border:3px solid var(--amber2); display:block; margin-top:10px;}
 
+/* minijuegos: campo de tiro y desenfunde */
+.range-arena{
+  position:relative; height:340px; background:#0e0c09;
+  border:2px solid var(--line); overflow:hidden; touch-action:manipulation;
+  background-image:linear-gradient(#0e0c09 85%, #241d12 85%);
+}
+.range-hud{position:absolute; top:6px; left:8px; color:var(--amber); font-size:13px; z-index:2;}
+.bottle{position:absolute; font-size:30px; cursor:crosshair; user-select:none; animation:wob 1.4s ease-in-out;}
+@keyframes wob{0%{transform:translateY(8px); opacity:0} 15%{opacity:1} 100%{transform:translateY(0)}}
+.bottle.hitfx{transform:scale(1.6); transition:transform .15s;}
+.missfx{position:absolute; color:var(--dim); font-size:22px;}
+.range-arena.qd{display:flex; align-items:center; justify-content:center; background:#080705;}
+.range-arena.qd.go{background:#1c130a;}
+.qd-msg{color:var(--ink); text-align:center; font-size:20px; letter-spacing:2px; pointer-events:none; padding:0 20px;}
+.range-arena.qd.go .qd-msg{color:var(--red); position:absolute; top:12px; left:0; right:0;}
+.qd-foe{position:absolute; font-size:52px; cursor:crosshair; user-select:none;}
+.range-arena.done{opacity:.85;}
+
+/* la gallera */
+.gallera-arena{
+  position:relative; height:90px; background:#241d12; border:2px solid var(--line);
+  margin-bottom:8px; display:flex; align-items:center; justify-content:space-around;
+}
+.gallo{font-size:44px; transition:transform .2s;}
+.gallo.flip{transform:scaleX(-1);}
+.gallo.peck{animation:peck .5s;}
+@keyframes peck{40%{transform:translateX(26px) rotate(18deg)} 100%{transform:none}}
+.gallo.flip.peck{animation:peckf .5s;}
+@keyframes peckf{40%{transform:scaleX(-1) translateX(26px) rotate(18deg)} 100%{transform:scaleX(-1)}}
+
+/* el mapa del territorio */
+.tmap{background:#1b1712; border:3px double var(--amber2); padding:4px;}
+.tmap svg{width:100%; height:auto; display:block;}
+.trail{stroke:var(--line); stroke-width:1.5; fill:none; stroke-dasharray:4 3;}
+.trail.dim2{stroke:#33415a; stroke-dasharray:none; opacity:.5;}
+.tmount{stroke:var(--dim); stroke-width:1.2; fill:none;}
+.tmark{fill:var(--amber);}
+.tmark.home{fill:var(--green);}
+.tmark.grave{fill:var(--red);}
+.tlabel{fill:var(--ink); font-size:10px; font-family:inherit; text-anchor:middle; letter-spacing:1px;}
+.tsub{fill:var(--dim); font-size:8px; font-family:inherit; text-anchor:middle; font-style:italic;}
+
 /* tumbas */
 .grave{border-left:3px solid var(--line); padding:6px 10px; margin-bottom:8px;}
 .grave .gname{color:var(--amber);}

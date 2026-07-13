@@ -532,7 +532,7 @@ ${best.alias || best.name} no suelta la pala cuando todos terminan. Eran amigos 
           { t: 'Aceptar el duelo (solo tú)', fx() {
               const p = player();
               CB.startCombat({
-                title: 'El duelo del camino', foes: [mkFoe('palido')], canFlee: false, soloPlayer: true,
+                title: 'El duelo del camino', foes: [mkFoe('palido')], canFlee: false, soloPlayer: true, quickdraw: true,
                 intro: 'El mundo se reduce a treinta pasos de polvo y un silencio que zumba.',
                 onEnd: (res) => {
                   if (res === 'win') {

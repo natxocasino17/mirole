@@ -353,7 +353,7 @@ export const TOMO1 = {
                 choice('En el arroyo seco elegí el duelo: Grey y yo, treinta pasos, el arroyo de juez. Como en el 74.');
                 const grey = mkFoe('grey');
                 CB.startCombat({
-                  title: 'Duelo en el arroyo seco', foes: [grey], canFlee: false, soloPlayer: true,
+                  title: 'Duelo en el arroyo seco', foes: [grey], canFlee: false, soloPlayer: true, quickdraw: true,
                   intro: 'Treinta pasos de grava blanca. Sus hombres y los tuyos forman el pasillo, rifles bajos, un tribunal de sombreros. Grey se quita el abrigo y lo dobla con cuidado, como para un viaje.',
                   onEnd: (res) => finalGrey(scene, res, true)
                 });

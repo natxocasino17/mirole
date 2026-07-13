@@ -4,8 +4,8 @@
 // migraciones de esquema viven aquí para siempre.
 import { seedRng, rngState, setRngState } from './rng.js';
 
-export const SCHEMA = 3;
-export const VERSION = '0.4.0';
+export const SCHEMA = 4;
+export const VERSION = '0.5.0';
 const KEY = 'mirole_save';
 
 export let G = null;
@@ -25,7 +25,7 @@ export function baseState() {
     wanted: [], wantedDay: -99,
     sideOffer: null, sideDay: -99,
     choices: [],
-    bonds: {}, nemeses: [],
+    bonds: {}, nemeses: [], relations: {},
     daily: { day: 0, whisky: 0, talks: [], clean: false, rumor: false, pet: false },
     pets: [], horse: null,
     cemetery: [], journal: [], log: [],
@@ -82,6 +82,11 @@ export function migrate(s) {
     // Cumpleaños del protagonista: determinista desde la creación de la partida.
     if (!s.flags.bday) s.flags.bday = (s.meta.created % 360) + 1;
     s.schema = 3;
+  }
+  if (s.schema === 3) {
+    // Relaciones con la gente del pueblo: afinidad que se construye.
+    s.relations = {};
+    s.schema = 4;
   }
   return s;
 }

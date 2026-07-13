@@ -45,6 +45,7 @@ export function startCombat(opts) {
     canFlee: opts.canFlee !== false, canPay: !!opts.canPay,
     intim: false, over: false, result: null,
     noNemesis: !!opts.noNemesis,
+    quickdraw: !!opts.quickdraw, qdDone: false,
     loot: 0, kills: 0, deaths: [], lootItems: []
   };
   C.units.forEach((u, i) => u.uid = i);
@@ -410,6 +411,21 @@ function loseCombat() {
     journal(`${G.horse.name} murió en el camino. Los caballos no eligen las guerras de sus jinetes.`);
     G.horse = null;
   }
+}
+
+// El resultado del desenfunde (minijuego): la primera sangre es de nervios.
+export function applyQuickdraw(win) {
+  if (!C) return;
+  C.qdDone = true;
+  if (win) {
+    for (const f of foesAlive()) f.shaken = 2;
+    clog('✦ Tu mano fue un latigazo: su acero salió tarde y su pulso lo sabe. (enemigo intimidado 2 turnos)');
+  } else {
+    const u = pcsAlive().find(p => p.ch.id === G.player);
+    if (u) u.shaken = 2;
+    clog('✝ Dudaste un latido de más. La mano lo recuerda. (−precisión 2 turnos)');
+  }
+  onUpdate();
 }
 
 export function finish() {

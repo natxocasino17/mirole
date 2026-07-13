@@ -10,7 +10,9 @@ import * as D from '../engine/director.js';
 import { EVENTS } from '../data/events.js';
 import { SIDEQUESTS } from '../data/sidequests.js';
 import { TOMO1 } from '../data/tomo1.js';
-import { otisLine, fitchLine, quillLine, curlyLine } from '../data/npcs.js';
+import { otisLine, fitchLine, quillLine, curlyLine, upstairsScene } from '../data/npcs.js';
+import { bjDeal, bjHit, bjStand, bjValue, bjResult, genFight, simFight } from '../engine/casino.js';
+import { practice, quickdraw } from '../engine/range.js';
 import { WEAPONS, GOODS, ROPA, UPGRADES, HORSES, SHOP_ALMACEN, SHOP_ARMERO, SHOP_SASTRE,
          mkWeapon, mkGood, mkRopa, itemName, itemDef, effAcc, effMag, effJam, effDurMax } from '../data/items.js';
 import { HERO_NAMES } from '../data/names.js';
@@ -26,7 +28,10 @@ let tab = 'cantina';
 let combatMode = null;   // null | 'shoot' | 'aim' | 'melee'
 let pk = null;           // estado de la mesa de póker
 let detailChar = null;   // ficha abierta en BANDA
-let mapaView = null;     // null | 'almacen' | 'armero' | 'sastre' | 'establo'
+let mapaView = null;     // null | 'almacen' | 'armero' | 'sastre' | 'establo' | 'terr'
+let cantinaView = null;  // null | 'bj' | 'gallera' | 'range'
+let bjS = null;          // mesa de blackjack
+let gfS = null;          // pelea de gallos en curso
 
 const $ = id => document.getElementById(id);
 
@@ -35,10 +40,16 @@ export function init() {
     const b = e.target.closest('button[data-tab]');
     if (!b || CB.C) return;
     tab = b.dataset.tab;
-    pk = null; detailChar = null; mapaView = null;
+    pk = null; detailChar = null; mapaView = null; cantinaView = null; bjS = null; gfS = null;
     renderAll();
   });
   CB.setOnUpdate(renderAll);
+  // El ticker se corta por diseño; tocarlo abre el registro entero.
+  $('ticker').addEventListener('click', () => {
+    if (!S.G || CB.C) return;
+    const lines = S.G.log.slice(-14).reverse().map(l => '› ' + l.t).join('\n\n');
+    showScene({ title: '📋 El registro', text: lines || 'Nada aún. El polvo espera.' }, () => {});
+  });
 }
 
 // ==================== pantalla de título ====================
@@ -118,7 +129,7 @@ export function renderAll() {
 
 function resetDaily() {
   if (S.G.daily.day !== S.G.time.day) {
-    S.G.daily = { day: S.G.time.day, whisky: 0, talks: [], clean: false, rumor: false, pet: false, otis: false };
+    S.G.daily = { day: S.G.time.day, whisky: 0, talks: [], clean: false, rumor: false, pet: false, otis: false, rose: false, gallo: false, range: false };
   }
 }
 
@@ -209,6 +220,9 @@ function cantina() {
   const mood = p.stress > 70 ? 'El humo se te pega a los pulmones y los ruidos, a la nuca.'
     : p.stress > 40 ? 'La cantina huele a serrín, sebo y conversaciones a medias.'
     : 'Hoy «El Cuervo» casi parece un hogar. Casi.';
+  if (cantinaView === 'bj') { renderBJ(); return; }
+  if (cantinaView === 'gallera') { renderGallera(); return; }
+  if (cantinaView === 'range') { renderRange(); return; }
   let html = `<h2>«EL CUERVO» — Marrow Creek</h2><div class="flavor">${mood}</div><div class="grid">`;
   html += `<button data-a="rest">🛏️ Descansar<br><span class="dim small">Dormir hasta mañana. Cura y calma.</span></button>`;
   html += `<button data-a="whisky" ${g.daily.whisky >= 3 || g.money < 3 ? 'disabled' : ''}>🥃 Whisky ($3)<br><span class="dim small">−12 estrés. ${3 - g.daily.whisky} restantes hoy.</span></button>`;
@@ -216,6 +230,11 @@ function cantina() {
   html += `<button data-a="clean" ${g.daily.clean ? 'disabled' : ''}>🔧 Limpiar armas<br><span class="dim small">+6 estado a todos los hierros.</span></button>`;
   html += `<button data-a="rumor" ${g.daily.rumor || g.money < 2 ? 'disabled' : ''}>👂 Rumores ($2)<br><span class="dim small">Invita a alguien. Escucha.</span></button>`;
   html += `<button data-a="otis" ${g.daily.otis ? 'disabled' : ''}>🍺 Charlar con Otis<br><span class="dim small">El tabernero lo sabe casi todo.</span></button>`;
+  const lily = g.relations.lily;
+  html += `<button data-a="rose" ${g.daily.rose ? 'disabled' : ''}>🌹 ${lily && lily.courting ? 'Ver a Delia' : 'El piso de arriba'}<br><span class="dim small">${lily && lily.courting ? 'Te guarda la silla de enfrente.' : 'Madame Vergne regenta. La casa no fía.'}</span></button>`;
+  html += `<button data-a="bj" ${g.money < 5 ? 'disabled' : ''}>🂡 Blackjack<br><span class="dim small">Veintiuno contra la casa.</span></button>`;
+  html += `<button data-a="gallo" ${g.daily.gallo || g.money < 5 ? 'disabled' : ''}>🐓 La gallera<br><span class="dim small">${g.daily.gallo ? 'Ya apostaste hoy.' : 'Apuesta y mira volar plumas.'}</span></button>`;
+  html += `<button data-a="range" ${g.daily.range || g.ammo.balas < 1 ? 'disabled' : ''}>🎯 Práctica de tiro<br><span class="dim small">${g.ammo.balas < 1 ? 'Sin balas.' : 'Botellas en la cerca. Gasta balas, gana ojo.'}</span></button>`;
   for (const c of squad) {
     const done = g.daily.talks.includes(c.id);
     html += `<button data-a="talk" data-id="${c.id}" ${done ? 'disabled' : ''}>💬 Hablar con ${c.alias || c.name}<br><span class="dim small">${done ? 'Ya hablasteis hoy.' : 'Lealtad ' + c.loyalty}</span></button>`;
@@ -259,12 +278,21 @@ function cantinaAct(d) {
   }
   if (d.a === 'rumor') {
     g.money -= 2; g.daily.rumor = true;
-    S.log('Rumor: ' + pick(RUMORS));
+    const r = pick(RUMORS);
+    S.log('Pagaste un whisky por un rumor.');
+    showScene({ title: '👂 Lo que se cuenta', text: r }, () => {});
   }
   if (d.a === 'otis') {
     g.daily.otis = true;
     showScene({ title: 'Otis, «El Cuervo»', text: otisLine() }, () => {});
   }
+  if (d.a === 'rose') {
+    g.daily.rose = true;
+    showScene(upstairsScene(), () => {});
+  }
+  if (d.a === 'bj') { bjS = { stage: 'bet' }; cantinaView = 'bj'; }
+  if (d.a === 'gallo') { gfS = { fight: genFight(), stage: 'bet' }; cantinaView = 'gallera'; }
+  if (d.a === 'range') { cantinaView = 'range'; }
   if (d.a === 'talk') talk(+d.id);
   if (d.a === 'pet') {
     g.daily.pet = true;
@@ -413,6 +441,9 @@ function mapa() {
       <button data-wanted="${w.id}">Cazar</button></div></div>`;
   }
 
+  // El territorio, dibujado
+  html += `<div class="grid"><button class="wide" data-shop="terr">🗺️ Ver el mapa del territorio<br><span class="dim small">Lo conocido, lo rumoreado y lo que mejor no visitar.</span></button></div>`;
+
   // Los comercios
   html += `<h3>🏘️ El pueblo</h3><div class="grid">
     <button data-shop="almacen">🏪 Almacén<br><span class="dim small">Munición, vendas, whisky.</span></button>
@@ -465,6 +496,8 @@ function shopHeader(title, flavor) {
 function renderShop(view) {
   const g = S.G;
   let html = '';
+
+  if (view === 'terr') { renderTerritory(); return; }
 
   if (view === 'almacen') {
     html = shopHeader('🏪 ALMACÉN', 'Huele a grano, cuerda y pólvora. Como debe ser.');
@@ -834,10 +867,195 @@ function menu() {
   };
 }
 
+// ==================== BLACKJACK ====================
+function renderBJ() {
+  const g = S.G;
+  const card = c => `<div class="pcard ${PK.cardRed(c) ? 'red' : ''}">${PK.cardTxt(c)}</div>`;
+  let html = `<button data-back="1">← A la barra</button><h2 style="margin-top:10px">🂡 BLACKJACK</h2>`;
+  if (bjS.stage === 'bet') {
+    html += `<div class="flavor">La casa pide hasta 17 y paga el blackjack 3 a 2. Otis reparte con cara de notario.</div><div class="grid">`;
+    for (const v of [5, 10, 25, 50]) html += `<button data-bet="${v}" ${g.money < v ? 'disabled' : ''}>Apostar $${v}</button>`;
+    html += `</div>`;
+  } else {
+    const done = bjS.stage === 'done';
+    const dShow = done ? bjS.d : [bjS.d[0]];
+    html += `<h3>La casa ${done ? '— ' + bjValue(bjS.d) : ''}</h3><div class="pkhand">${dShow.map(card).join('')}${done ? '' : '<div class="pcard back">?</div>'}</div>`;
+    html += `<h3>Tu mano — ${bjValue(bjS.p)}</h3><div class="pkhand">${bjS.p.map(card).join('')}</div>`;
+    if (!done) {
+      html += `<div class="grid"><button data-bj="hit">Otra carta</button><button data-bj="stand">Plantarse</button></div>`;
+    } else {
+      const mult = bjResult(bjS);
+      const win = Math.floor(bjS.bet * mult);
+      const msg = mult === 0 ? `La casa se queda tus $${bjS.bet}. Otis no disfruta. Mucho.`
+        : mult === 1 ? 'Empate. Cada cual con lo suyo, como los buenos vecinos.'
+        : mult === 2.5 ? `¡BLACKJACK! $${win}. Otis revisa la baraja por principio.`
+        : `Ganas $${win}. La casa aplaude por dentro, muy adentro.`;
+      html += `<div class="panel">${msg}</div><div class="grid"><button data-bj="again">Otra mano</button><button data-bj="out">Dejar la mesa</button></div>`;
+    }
+  }
+  $('screen').innerHTML = html;
+  const back = $('screen').querySelector('[data-back]');
+  if (back) back.onclick = () => { cantinaView = null; bjS = null; renderAll(); };
+  $('screen').querySelectorAll('button[data-bet]').forEach(b => b.onclick = () => {
+    const bet = +b.dataset.bet;
+    g.money -= bet;
+    bjS = Object.assign(bjDeal(), { bet });
+    if (bjValue(bjS.p) === 21) { bjStand(bjS); settleBJ(); }
+    renderAll();
+  });
+  $('screen').querySelectorAll('button[data-bj]').forEach(b => b.onclick = () => {
+    const a = b.dataset.bj;
+    if (a === 'hit') { bjHit(bjS); if (bjS.stage === 'done') settleBJ(); }
+    if (a === 'stand') { bjStand(bjS); settleBJ(); }
+    if (a === 'again') bjS = { stage: 'bet' };
+    if (a === 'out') { cantinaView = null; bjS = null; }
+    renderAll();
+  });
+}
+function settleBJ() {
+  const mult = bjResult(bjS);
+  const win = Math.floor(bjS.bet * mult);
+  if (win > 0) S.G.money += win;
+  if (mult >= 2) { S.G.stats.pokerWon += win - bjS.bet; addStress(player(), -3); }
+  else if (mult === 0) { S.G.stats.pokerLost += bjS.bet; addStress(player(), 2); }
+  S.save();
+}
+
+// ==================== LA GALLERA ====================
+function renderGallera() {
+  const g = S.G, f = gfS.fight;
+  let html = `<button data-back="1">← A la barra</button><h2 style="margin-top:10px">🐓 LA GALLERA</h2>`;
+  if (gfS.stage === 'bet') {
+    html += `<div class="flavor">Serrín, humo y gritos. Los stats no mienten; las plumas, a veces.</div>
+      <div class="grid">
+        <div class="panel"><b class="amber">🐓 ${f.a.name}</b><br><span class="small">Ataque ${f.a.ataque} · Aguante ${f.a.aguante}<br>paga ×${f.payA}</span></div>
+        <div class="panel"><b class="amber">🐓 ${f.b.name}</b><br><span class="small">Ataque ${f.b.ataque} · Aguante ${f.b.aguante}<br>paga ×${f.payB}</span></div>
+      </div><h3>Tu apuesta</h3><div class="grid">`;
+    for (const side of ['a', 'b']) {
+      for (const v of [5, 15, 30]) {
+        html += `<button data-gbet="${side}:${v}" ${g.money < v ? 'disabled' : ''}>$${v} a ${f[side].name}</button>`;
+      }
+    }
+    html += `</div>`;
+    $('screen').innerHTML = html;
+    $('screen').querySelector('[data-back]').onclick = () => { cantinaView = null; gfS = null; renderAll(); };
+    $('screen').querySelectorAll('button[data-gbet]').forEach(b => b.onclick = () => {
+      const [side, v] = b.dataset.gbet.split(':');
+      g.money -= +v;
+      g.daily.gallo = true;
+      gfS.bet = { side, v: +v };
+      gfS.sim = simFight(f);
+      gfS.stage = 'fight';
+      gfS.shown = 0;
+      S.save();
+      renderAll();
+      animateFight();
+    });
+    return;
+  }
+  // pelea en curso / terminada
+  const done = gfS.shown >= gfS.sim.rounds.length;
+  html += `<div class="gallera-arena"><span id="gA" class="gallo">🐓</span><span id="gB" class="gallo flip">🐓</span></div>
+    <div class="clog" id="gLog">${gfS.sim.rounds.slice(0, gfS.shown).map(r => `<div>${r.txt}${r.dmg ? ` <span class="red">(−${r.dmg})</span>` : ''}</div>`).join('')}</div>`;
+  if (done) {
+    const won = gfS.bet.side === 'a' ? gfS.sim.winner === f.a.name : gfS.sim.winner === f.b.name;
+    const pay = won ? Math.floor(gfS.bet.v * (gfS.bet.side === 'a' ? f.payA : f.payB)) : 0;
+    if (!gfS.settled) {
+      gfS.settled = true;
+      if (pay > 0) { S.G.money += pay; S.G.stats.pokerWon += pay - gfS.bet.v; }
+      else S.G.stats.pokerLost += gfS.bet.v;
+      S.save();
+    }
+    html += `<div class="panel">🏆 <b class="amber">${gfS.sim.winner}</b> se queda la arena. ${won ? `Cobras $${pay}. El gallero te mira con nuevo respeto.` : `Tus $${gfS.bet.v} vuelan con las plumas. El gallero te mira con viejo cariño.`}</div>
+      <div class="grid"><button class="wide" data-back="1">Volver a la barra</button></div>`;
+  }
+  $('screen').innerHTML = html;
+  const back2 = $('screen').querySelector('[data-back]');
+  if (back2) back2.onclick = () => { cantinaView = null; gfS = null; renderAll(); };
+  const lg = $('gLog');
+  if (lg) lg.scrollTop = lg.scrollHeight;
+}
+function animateFight() {
+  if (!gfS || gfS.stage !== 'fight') return;
+  if (gfS.shown >= gfS.sim.rounds.length) { renderAll(); return; }
+  gfS.shown++;
+  renderAll();
+  const r = gfS.sim.rounds[gfS.shown - 1];
+  const el = r.att === gfS.fight.a.name ? $('gA') : $('gB');
+  if (el) el.classList.add('peck');
+  setTimeout(animateFight, 650);
+}
+
+// ==================== PRÁCTICA DE TIRO ====================
+function renderRange() {
+  const g = S.G;
+  const maxShots = Math.min(8, g.ammo.balas);
+  $('screen').innerHTML = `<button data-back="1">← A la barra</button>
+    <h2 style="margin-top:10px">🎯 LA CERCA DE LAS BOTELLAS</h2>
+    <div class="flavor">15 segundos, ${maxShots} balas. Toca las botellas: cada acierto entrena tu puntería DE VERDAD.</div>
+    <div id="rangeBox"></div>`;
+  $('screen').querySelector('[data-back]').onclick = () => { cantinaView = null; renderAll(); };
+  practice($('rangeBox'), 15, maxShots, (hits, shots) => {
+    g.ammo.balas = Math.max(0, g.ammo.balas - shots);
+    g.stats.shots += shots;
+    g.daily.range = true;
+    const p = player();
+    addXp(p, 'punteria', hits);
+    S.log(`Práctica: ${hits}/${shots} botellas. ${hits >= shots * 0.7 && shots > 3 ? 'Fitch estaría casi orgulloso.' : 'La cerca sobrevivió con dignidad.'}`);
+    S.save();
+    cantinaView = null;
+    renderAll();
+    showScene({ title: '🎯 Resultado', text: `${hits} botellas de ${shots} disparos.\n\n${hits > 5 ? 'El pueblo entero oyó el ritmo. Eso también es fama.' : hits > 2 ? 'Mano firme. La leyenda se fabrica bala a bala.' : 'Las botellas ganaron hoy. Mañana es otro duelo.'}\n\n(+${hits} XP de puntería)` }, () => {});
+  });
+}
+
+// ==================== EL MAPA DEL TERRITORIO ====================
+function renderTerritory() {
+  const f = S.G.flags;
+  const known = {
+    dryWells: S.G.once.includes('sq_dry_wells'),
+    arroyo: f.t1done >= 8,
+    bentFork: S.G.once.includes('sq_cartas') || f.t1done >= 8
+  };
+  const mark = (x, y, label, sub, cls) => `
+    <circle cx="${x}" cy="${y}" r="4" class="tmark ${cls || ''}"/>
+    <text x="${x}" y="${y - 8}" class="tlabel">${label}</text>
+    ${sub ? `<text x="${x}" y="${y + 15}" class="tsub">${sub}</text>` : ''}`;
+  $('screen').innerHTML = `<button data-back="1">← Volver al pueblo</button>
+    <h2 style="margin-top:10px">🗺️ TERRITORIO DE RED MARROW</h2>
+    <div class="flavor">Dibujado de memoria y de rumores. Las distancias miente el que las dibujó.</div>
+    <div class="tmap"><svg viewBox="0 0 360 300" xmlns="http://www.w3.org/2000/svg">
+      <path d="M20 60 Q80 90 60 130 Q40 170 70 230 Q90 260 140 250" class="trail dim2"/>
+      <path d="M170 170 L150 62 M170 170 Q240 160 280 200 M170 170 Q250 120 318 82 M170 170 Q120 150 62 122 M170 170 Q110 200 62 232" class="trail"/>
+      <path d="M30 100 l8 -10 l8 10 M50 95 l8 -10 l8 10 M195 30 l8 -10 l8 10 M215 35 l8 -10 l8 10 M235 28 l8 -10 l8 10" class="tmount"/>
+      <text x="222" y="18" class="tsub">colinas del norte</text>
+      <text x="285" y="255" class="tsub">tierras malas</text>
+      <text x="30" y="285" class="tsub">el desierto grande</text>
+      ${mark(170, 170, 'MARROW CREEK', 'tu mesa, tu gente', 'home')}
+      ${mark(318, 82, 'BLACKVEIN CITY', 'humo y libretas')}
+      ${mark(62, 122, 'El Desfiladero', 'donde empezó todo', 'grave')}
+      ${mark(150, 62, known.bentFork ? 'Bent Fork' : '¿?', known.bentFork ? 'la iglesia quemada' : '')}
+      ${known.dryWells ? mark(62, 232, 'Dry Wells', 'el pueblo del silencio', 'grave') : ''}
+      ${known.arroyo ? mark(280, 200, 'El Arroyo Seco', 'dos tumbas con historia', 'grave') : ''}
+    </svg></div>
+    <div class="panel small dim">Los lugares aparecen cuando los vives. El territorio se gana a pie.</div>`;
+  $('screen').querySelector('[data-back]').onclick = () => { mapaView = null; renderAll(); };
+}
+
 // ==================== COMBATE ====================
 function renderCombat() {
   const C = CB.C;
   $('nav').querySelectorAll('button').forEach(b => b.classList.remove('on'));
+  // Duelo: el desenfunde se juega con el dedo, no con el dado.
+  if (C.quickdraw && !C.qdDone && C.active && C.active.ch && C.active.ch.id === S.G.player) {
+    const foe = C.units.find(u => u.kind === 'en' && !u.dead);
+    $('screen').innerHTML = `<div class="combat"><div class="c-title">⚔ ${C.title}</div>
+      <div class="flavor">Tus reflejos (${C.active.sk.reflejos}) contra los suyos (${foe ? foe.sk.reflejos : '?'}). Espera la señal. Toca la silueta. Reza después.</div>
+      <div id="qdBox"></div></div>`;
+    quickdraw($('qdBox'), C.active.sk.reflejos, foe ? foe.sk.reflejos : 50, foe ? foe.name : 'el otro',
+      (win) => { CB.applyQuickdraw(win); });
+    return;
+  }
   let html = `<div class="combat"><div class="c-title">⚔ ${C.title}</div><div class="round">Ronda ${C.round}</div>`;
 
   html += `<div class="foes">`;

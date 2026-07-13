@@ -1,13 +1,13 @@
 /* MIROLE — service worker. Cache-first: el juego debe abrir sin internet
    en mitad del desierto, de un vuelo o del año 2060. Sube la versión al
    desplegar cambios. */
-const V = 'mirole-v0.4.0';
+const V = 'mirole-v0.5.0';
 const CORE = [
   './', 'index.html', 'css/style.css', 'manifest.webmanifest',
   'js/main.js',
   'js/engine/rng.js', 'js/engine/state.js', 'js/engine/chars.js',
   'js/engine/time.js', 'js/engine/director.js', 'js/engine/combat.js',
-  'js/engine/jobs.js', 'js/engine/poker.js',
+  'js/engine/jobs.js', 'js/engine/poker.js', 'js/engine/casino.js', 'js/engine/range.js',
   'js/data/items.js', 'js/data/names.js', 'js/data/enemies.js',
   'js/data/dialogs.js', 'js/data/events.js', 'js/data/prologue.js',
   'js/data/sidequests.js', 'js/data/tomo1.js', 'js/data/npcs.js', 'js/data/events2.js',

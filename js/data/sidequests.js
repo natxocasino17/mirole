@@ -328,7 +328,7 @@ export const SIDEQUESTS = {
         kid.sk.punteria = 50; kid.sk.reflejos = 60; kid.sk.voluntad = 55;
         kid.hp = kid.hpMax = 5;
         CB.startCombat({
-          title: 'Duelo al alba', foes: [kid], canFlee: false, soloPlayer: true,
+          title: 'Duelo al alba', foes: [kid], canFlee: false, soloPlayer: true, quickdraw: true,
           intro: 'La calle mayor, vacía y larga. Un perro se aparta con criterio. Cassidy Ray ocupa su extremo con la solemnidad de quien lleva semanas ensayando este momento y ni un segundo el siguiente.',
           onEnd: (res) => {
             if (res !== 'win') {
