@@ -8,6 +8,7 @@ import { rand, rint, chance, pick } from './rng.js';
 import { WEAPONS, GOODS, ROPA, LOOT_GOODS, LOOT_TALISMANS, mkGood, mkRopa, mkWeapon, effAcc, effMag, effJam } from '../data/items.js';
 import { addXp, addStress, applyWound, activeSquad, buryChar, bonus } from './chars.js';
 import { INTIM_LINES, FAREWELLS } from '../data/dialogs.js';
+import { FIRST, LAST, SCARS } from '../data/names.js';
 
 export let C = null;
 let onUpdate = () => {};
@@ -43,6 +44,7 @@ export function startCombat(opts) {
     log: [], onEnd: opts.onEnd || null,
     canFlee: opts.canFlee !== false, canPay: !!opts.canPay,
     intim: false, over: false, result: null,
+    noNemesis: !!opts.noNemesis,
     loot: 0, kills: 0, deaths: [], lootItems: []
   };
   C.units.forEach((u, i) => u.uid = i);
@@ -94,6 +96,28 @@ function checkEnd() {
   return false;
 }
 
+// La probabilidad de acierto NO es un dado ciego: es pura aritmética de
+// stats. Puntería del tirador contra REFLEJOS del blanco (esquiva),
+// cobertura, distancia, arma, mejoras, estrés y heridas. La UI la muestra
+// antes de disparar: decides con números, no con fe.
+export function hitChance(att, tgt, aimed) {
+  if (!att.w || att.w.broken) return 0;
+  const wd = WEAPONS[att.w.def];
+  const d = dist(att, tgt);
+  let acc = 4 + effAcc(att.w) + att.sk.punteria * 0.5 + (aimed ? 15 : 0) + (wd.mods ? wd.mods[d] : 0)
+          - (tgt.cover ? 20 : 0) - (att.shaken ? 20 : 0)
+          - tgt.sk.reflejos * 0.15
+          - (tgt.kind === 'pc' ? bonus(tgt.ch, 'reflejos') * 0.15 : 0);
+  if (att.kind === 'pc') {
+    acc += bonus(att.ch, 'punteria');
+    if (att.ch.stress > 70) acc -= 10;
+    if (att.ch.wounds.some(x => x.includes('Brazo'))) acc -= 5;
+  } else {
+    acc -= 6; // los matones disparan con el hígado, no con el ojo
+  }
+  return Math.round(Math.max(5, Math.min(95, acc)));
+}
+
 // ---------- el disparo: cada bala es una decisión ----------
 function fireShot(att, tgt, aimed) {
   const w = att.w, wd = WEAPONS[w.def];
@@ -110,17 +134,7 @@ function fireShot(att, tgt, aimed) {
   if (w.dur === 0 && !w.broken) { w.broken = true; clog(`✦ ${wd.name} de ${att.name} se ROMPE con un chasquido feo.`); return; }
   if (att.kind === 'pc') { G.stats.shots++; addXp(att.ch, 'punteria', 1); }
 
-  const d = dist(att, tgt);
-  let acc = effAcc(w) + att.sk.punteria * 0.5 + (aimed ? 15 : 0) + (wd.mods ? wd.mods[d] : 0)
-          - (tgt.cover ? 20 : 0) - (att.shaken ? 20 : 0);
-  if (att.kind === 'pc') {
-    acc += bonus(att.ch, 'punteria');
-    if (att.ch.stress > 70) acc -= 10;
-    if (att.ch.wounds.some(x => x.includes('Brazo'))) acc -= 5;
-  } else {
-    acc -= 6; // los matones disparan con el hígado, no con el ojo
-  }
-  acc = Math.max(5, Math.min(95, acc));
+  const acc = hitChance(att, tgt, aimed);
 
   if (rand() * 100 > acc) {
     clog(`${att.name} dispara a ${tgt.name}. La bala astilla madera.`);
@@ -400,7 +414,26 @@ function loseCombat() {
 
 export function finish() {
   const result = C.result, cb = C.onEnd, deaths = C.deaths, kills = C.kills, lootItems = C.lootItems;
+  const fled = C.units.filter(u => u.kind === 'en' && u.fled);
+  if (!C.noNemesis) maybeNemesis(fled, C.title);
   C = null;
   save();
-  if (cb) cb(result, { deaths, kills, lootItems });
+  if (cb) cb(result, { deaths, kills, lootItems, fledFoes: fled.map(f => f.name) });
+}
+
+// Los que huyen no siempre desaparecen: algunos van a buscar motivos.
+// La némesis nace de TU combate — un villano fabricado por tu partida.
+function maybeNemesis(fled, title) {
+  G.nemeses = G.nemeses || [];
+  if (G.nemeses.length >= 2) return;
+  const cand = fled.find(f => ['maton', 'pistolero', 'matarife', 'cuervo'].includes(f.tpl));
+  if (!cand || !chance(0.3)) return;
+  G.nemeses.push({
+    id: rint(1000, 999999),
+    name: `${pick(FIRST)} «${pick(SCARS)}» ${pick(LAST)}`,
+    tpl: cand.tpl, lvl: 1,
+    due: G.time.day + rint(18, 40),
+    origin: title
+  });
+  log('Uno de los que escaparon se giró a mirarte antes de perderse. Demasiado rato.');
 }

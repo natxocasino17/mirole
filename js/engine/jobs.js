@@ -178,8 +178,10 @@ const RUNNERS = {
       opts: [{ t: 'Partir al alba' }]
     }, () => {
       travel(1);
-      // Un buen caballo esquiva problemas; un buen perro los anuncia.
-      const ambushP = G.horse && G.horse.tier >= 3 ? 0.5 : 0.65;
+      // Un buen caballo esquiva problemas; un buen perro los anuncia;
+      // y un líder sigiloso elige caminos que las emboscadas no conocen.
+      let ambushP = G.horse && G.horse.tier >= 3 ? 0.5 : 0.65;
+      ambushP -= player().skills.sigilo * 0.002;
       if (chance(ambushP)) {
         const foes = foesForRisk(job.risk);
         dogWarning(foes);

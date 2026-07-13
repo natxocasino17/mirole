@@ -36,6 +36,10 @@ export const HERO_NAMES = [
 
 export const DOG_NAMES = ['Bala', 'Whisky', 'Sargento', 'Ceniza'];
 
+// Apodos que deja una derrota: así vuelven los que escapan.
+export const SCARS = ['el Tuerto', 'Media Oreja', 'Cara Quemada', 'el Cojo',
+                      'Tres Dedos', 'Costura', 'el Rencoroso', 'Medianoche'];
+
 // Rasgos visibles de reclutas.
 export const TRAITS = [
   'fanfarrón', 'callado', 'supersticioso', 'jugador', 'devoto', 'cínico',

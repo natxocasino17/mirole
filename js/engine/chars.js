@@ -177,7 +177,7 @@ export function buryChar(ch, cause, epitaph) {
   // Si era de la mesa, se le despide como se debe: el funeral llega
   // en cuanto se asiente el polvo.
   if (ch.id && G.chars[ch.id]) {
-    G.flags.funeralFor = { name: ch.name, alias: ch.alias, bio: ch.bio || [], trait: (ch.traits || [])[0] || '' };
+    G.flags.funeralFor = { id: ch.id, name: ch.name, alias: ch.alias, bio: ch.bio || [], trait: (ch.traits || [])[0] || '' };
     queueEvent('funeral');
   }
 }

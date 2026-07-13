@@ -2,7 +2,7 @@
 // Lee tu dinero, tu estrés, las lealtades y los secretos de tu gente, y
 // genera la siguiente escena de tu vida. La traición jamás sale de un
 // dado: sale de un secreto que siempre estuvo ahí, más la ocasión.
-import { G, queueEvent, onceDone } from './state.js';
+import { G, queueEvent, onceDone, yearOf } from './state.js';
 import { chance, pick } from './rng.js';
 import { aliveSquad, player } from './chars.js';
 import { DAILY_POOL, MYTHIC_POOL, EVENTS } from '../data/events.js';
@@ -18,6 +18,37 @@ export function dailyTick() {
 
   // 🎪 Cada dos semanas, el pueblo respira: día de feria.
   if (G.time.day % 14 === 0) queueEvent('feria');
+
+  // 📰 El Courier sale cada mes: tu leyenda, mal escrita por otros.
+  if (G.time.day % 30 === 6) queueEvent('periodico');
+
+  // 📅 Aniversarios: el tiempo es circular para los que recuerdan.
+  const doy = (G.time.day - 1) % 360 + 1;
+  const yr = yearOf(G.time.day);
+  const sam = G.cemetery.find(t => t.name === 'Sam Corddry');
+  if (sam) {
+    const sdoy = (sam.day - 1) % 360 + 1;
+    if (doy === sdoy && G.time.day > sam.day + 30 && G.flags.anivSam !== yr) {
+      G.flags.anivSam = yr;
+      queueEvent('aniversario_sam');
+    }
+  }
+  if (G.flags.bday === doy && G.flags.bdayYr !== yr && G.time.day > 30) {
+    G.flags.bdayYr = yr;
+    queueEvent('cumpleanos');
+  }
+
+  // 🔥 La fogata: la banda se pertenece también sin ti.
+  if (aliveSquad().filter(c => c.id !== G.player).length >= 2 && chance(0.08)) queueEvent('fogata');
+
+  // ☠️ Las némesis vencen su plazo y vienen a cobrarlo.
+  for (const nm of G.nemeses || []) {
+    if (G.time.day >= nm.due && !nm.waiting) {
+      nm.waiting = false; // se limpia al resolverse; el dedupe de pending evita duplicados
+      queueEvent('nemesis:' + nm.id);
+      nm.due = G.time.day + 5; // reintento suave si el evento no llegó a verse
+    }
+  }
 
   // Crisis interior: el estrés alto engendra pesadillas.
   if (p.stress >= 85) queueEvent('pesadilla');

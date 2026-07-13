@@ -372,9 +372,25 @@ export const EVENTS = {
       G.flags.funeralFor = null;
       const bioLine = f.bio && f.bio.length ? `Sabías de ${f.alias || f.name} que ${pick(f.bio)}.` : '';
       const eli = aliveSquad().find(c => c.name === 'Eli Marsh');
+      // El mejor amigo del muerto (forjado en las fogatas) lo lleva peor.
+      let friendLine = '';
+      if (f.id && G.bonds) {
+        let best = null, bestV = 1;
+        for (const c of aliveSquad()) {
+          if (c.id === f.id || c.id === G.player) continue;
+          const v = G.bonds[`${Math.min(c.id, f.id)}-${Math.max(c.id, f.id)}`] || 0;
+          if (v > bestV) { best = c; bestV = v; }
+        }
+        if (best) {
+          addStress(best, 10);
+          friendLine = `
+
+${best.alias || best.name} no suelta la pala cuando todos terminan. Eran amigos de fogata, de los de verdad. Hoy alguien le ha amputado eso.`;
+        }
+      }
       return {
         title: `⚰️ El entierro de ${f.alias || f.name}`,
-        text: `Cavar la tumba de alguien de tu mesa es un oficio que no mejora con la práctica.\n\n${bioLine} Ahora todo eso — lo contado y lo que nunca llegó a contar — cabe en dos metros de tierra del cementerio de Marrow Creek.\n\n${eli ? 'Eli se pone el alzacuellos que ya no usa. Solo para esto se lo pone.' : 'No hay predicador. Habrá que arreglarse con lo que uno cargue dentro.'}\n\n¿Cómo lo despides?`,
+        text: `Cavar la tumba de alguien de tu mesa es un oficio que no mejora con la práctica.\n\n${bioLine} Ahora todo eso — lo contado y lo que nunca llegó a contar — cabe en dos metros de tierra del cementerio de Marrow Creek.\n\n${eli ? 'Eli se pone el alzacuellos que ya no usa. Solo para esto se lo pone.' : 'No hay predicador. Habrá que arreglarse con lo que uno cargue dentro.'}${friendLine}\n\n¿Cómo lo despides?`,
         opts: [
           { t: 'Enterrarlo con su hierro al cinto', fx() {
               for (const c of aliveSquad()) if (c.id !== G.player) c.loyalty = Math.min(100, c.loyalty + 4);
@@ -536,3 +552,7 @@ export const EVENTS = {
 };
 
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// «El mundo te recuerda»: periódico, sueños, aniversarios, fogata, némesis.
+import { EVENTS2 } from './events2.js';
+Object.assign(EVENTS, EVENTS2);

@@ -231,7 +231,12 @@ function cantina() {
 
 function cantinaAct(d) {
   const g = S.G, p = player();
-  if (d.a === 'rest') { T.restDay(); JB.maybeRefreshJobs(); }
+  if (d.a === 'rest') {
+    T.restDay();
+    JB.maybeRefreshJobs();
+    // El cementerio también habla: a veces, dormir es visitarlo.
+    if (chance(0.12) && g.cemetery.some(t => !t.animal)) S.queueEvent('sueno');
+  }
   if (d.a === 'whisky') {
     g.money -= 3; g.daily.whisky++;
     addStress(p, p.traits.includes('bebedor') ? -16 : -12);
@@ -841,8 +846,11 @@ function renderCombat() {
     const cls = ['unit foe'];
     if (u.dead || u.fled) cls.push('down');
     if (combatMode && !u.dead && !u.fled) cls.push('targetable');
+    // Con un objetivo en la mira, los números mandan: % real de acierto.
+    const showPct = combatMode && (combatMode === 'shoot' || combatMode === 'aim') && !u.dead && !u.fled && C.active;
+    const pct = showPct ? CB.hitChance(C.active, u, combatMode === 'aim') : 0;
     html += `<div class="${cls.join(' ')}" data-tgt="${u.uid}">
-      <div class="uname">${u.name}</div>
+      <div class="uname">${u.name}${showPct ? ` <span class="amber">${pct}%</span>` : ''}</div>
       <div class="tags">${u.dead ? '✝ muerto' : u.fled ? 'huyó' : describeHp(u.hp, u.hpMax)}
       ${!u.dead && !u.fled ? ` · ${u.rank === 'f' ? 'cerca' : 'lejos'}${u.cover ? ' · 🪨' : ''}${u.shaken ? ' · 😨' : ''}${u.jam ? ' · ⚙' : ''}` : ''}</div></div>`;
   }

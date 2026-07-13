@@ -15,6 +15,7 @@ export function startPrologue(name, alias, scene, done) {
   G.squad.push(hero.id);
   G.money = 12;
   G.ammo.balas = 10;
+  G.flags.bday = (G.meta.created % 360) + 1;
   G.ammo.cartuchos = 4;
 
   scene({
