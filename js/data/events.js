@@ -2,7 +2,7 @@
 // Los cotidianos dan textura; los de secreto anuncian traiciones que
 // siempre estuvieron ahí; los MÍTICOS son la razón por la que dentro de
 // tres años el corazón te dará un vuelco en una parada de autobús.
-import { G, log, journal } from '../engine/state.js';
+import { G, log, journal, yearOf } from '../engine/state.js';
 import { rint, pick } from '../engine/rng.js';
 import { genRecruit, player, aliveSquad, addStress, addXp } from '../engine/chars.js';
 import { mkGood, mkWeapon } from './items.js';
@@ -12,7 +12,8 @@ import { SECRET_HINTS } from './dialogs.js';
 import * as CB from '../engine/combat.js';
 
 export const DAILY_POOL = ['forastero', 'tormenta', 'predicador', 'recuerdo_sam',
-                           'soborno', 'borracho', 'perro_flaco', 'carta_ada'];
+                           'soborno', 'borracho', 'perro_flaco', 'carta_ada',
+                           'serpiente', 'caballo_salvaje'];
 export const MYTHIC_POOL = ['espadachin', 'taberna_niebla', 'palido'];
 
 export const EVENTS = {
@@ -156,6 +157,68 @@ export const EVENTS = {
     }
   },
 
+  serpiente: {
+    once: true,
+    cond: () => G.pets.length > 0 && G.time.day > 50,
+    build() {
+      const dog = G.pets[0];
+      return {
+        title: 'La serpiente',
+        text: `Un chillido corto detrás del abrevadero. ${dog.name} sale trastabillando con dos puntos rojos en la pata y una cascabel alejándose con la conciencia tranquila de las serpientes.\n\nEl veneno no espera a nadie.`,
+        opts: [
+          { t: 'Abrirle la herida y chupar el veneno', fx() {
+              const p = player();
+              if (p.skills.vigor + rint(0, 30) >= 45) {
+                addStress(p, 4);
+                return `Navaja, herida en cruz y la boca amarga media semana.\n\n${dog.name} tiembla dos noches con la cabeza en tu bota y al tercer día persigue gallinas como si la muerte fuera un rumor.\n\nNo lo era. Pero perdió.`;
+              }
+              G.pets = [];
+              G.cemetery.push({ name: dog.name, animal: '🐕', died: yearOf(G.time.day), day: G.time.day,
+                cause: 'Mordedura de cascabel', epitaph: 'El único que nunca dudó.' });
+              journal(`${dog.name} murió de una mordedura de cascabel, con la cabeza en mi bota, moviendo el rabo hasta el final. El territorio cobra hasta a los que no juegan.`);
+              addStress(player(), 12);
+              return `Haces todo lo que sabes y no alcanza.\n\n${dog.name} se apaga de madrugada, la cabeza en tu bota, el rabo moviéndose a ratos, soñando o despidiéndose.\n\nLo entierras detrás de la cantina, donde daba el sol de la tarde. La banda entera cava. Nadie tiene edad para llorar un perro y lloráis todos.`;
+            } },
+          { t: 'Cargarlo y galopar al matasanos ($15)', fx() {
+              if (G.money < 15) {
+                return 'Te palpas los bolsillos delante del matasanos y no llega. «A crédito no curo perros», dice. Vuelves al abrevadero rezando a nada. Queda la navaja.';
+              }
+              G.money -= 15;
+              return `El matasanos gruñe que él cura personas, cobra los $15 y trabaja una hora con el ceño de los que van a cobrar de más y curar de más.\n\n${dog.name} sale vendado, drogado y ofendidísimo.\n\nVivirá. Odiará los cascabeles y las básculas del matasanos, en ese orden.`;
+            } }
+        ]
+      };
+    }
+  },
+
+  caballo_salvaje: {
+    once: true,
+    cond: () => !G.horse && G.time.day > 20,
+    build() {
+      return {
+        title: 'El mustang del arroyo',
+        text: 'Lleva tres mañanas bajando a beber al arroyo del pueblo: un mustang bayo, sin hierro, sin dueño, con una cicatriz de lazo en el cuello y opiniones firmes sobre los humanos.\n\nEl del establo ofrece $20 por avisarle. O podrías intentarlo tú.',
+        opts: [
+          { t: 'Acercarte despacio (Reflejos + paciencia)', fx() {
+              const p = player();
+              addXp(p, 'reflejos', 3);
+              if (p.skills.reflejos + rint(0, 30) >= 50) {
+                G.horse = { name: 'Arroyo', tier: 2, def: 'mustang' };
+                journal('Amansé al mustang del arroyo a base de manzanas, paciencia y dos revolcones. Lo llamé Arroyo. El del establo dice que valía $60. No está en venta. Nada con cicatrices está en venta.');
+                return 'Tres mañanas de manzanas, quietud y hablarle bajo. Al cuarto día te deja poner la mano. Al quinto, la manta. Al sexto te tira de cabeza al arroyo y — satisfecho con la demostración — se deja ensillar.\n\nYa tienes caballo. Se llama Arroyo. Lo has decidido tú; él ha decidido tolerarlo.';
+              }
+              addStress(p, 3);
+              return 'Te acercas bien, susurras bien, y en el último momento el mustang decide que no: coz al aire, relincho de burla y polvo hasta el horizonte.\n\nEl del establo, mirando desde lejos, aplaude despacio. Muy gracioso todo.';
+            } },
+          { t: 'Avisar al establo ($20)', fx() {
+              G.money += 20; G.stats.earned += 20;
+              return 'El del establo lo acorrala con tres peones y dos lazos. Cobras tus $20.\n\nEl mustang te mira desde el corral mientras te vas. No con rencor. Con inventario.';
+            } }
+        ]
+      };
+    }
+  },
+
   carta_ada: {
     once: true,
     cond: () => G.flags.promSam === 'hija' && G.time.day > 40,
@@ -286,6 +349,17 @@ export const EVENTS = {
         title: 'Mientras estabas fuera',
         text: pick(lines) + '\n\nEl polvo esperó. El polvo siempre espera.',
         opts: [{ t: 'Retomar las riendas' }]
+      };
+    }
+  },
+
+  // El pregón de las historias únicas: avisa de que hay algo en el MAPA.
+  rumor_historia: {
+    build() {
+      return {
+        title: 'Se cuenta una historia',
+        text: 'En la barra de «El Cuervo» ha nacido un rumor con cuerpo: nombres, lugares, dinero o pena de por medio.\n\nSi te interesa, está en el MAPA, marcado con ★. Las historias del territorio no esperan para siempre... pero suelen esperar un poco.',
+        opts: [{ t: 'Tomar nota' }]
       };
     }
   },

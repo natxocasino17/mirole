@@ -36,8 +36,9 @@ export function restDay() {
 function upkeep() {
   G.time.lastUpkeep = G.time.day;
   const squad = aliveSquad();
-  const wages = squad.filter(c => c.id !== G.player).reduce((n, c) => n + c.salario, 0);
-  const food = squad.length * 2 + G.pets.length;
+  const wages = squad.filter(c => c.id !== G.player).reduce((n, c) => n + c.salario, 0)
+    + (G.flags.ward_tobias ? 1 : 0);
+  const food = squad.length * 2 + G.pets.length + (G.horse ? G.horse.tier : 0);
   const total = wages + food;
   if (G.money >= total) {
     G.money -= total;

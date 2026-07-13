@@ -8,7 +8,9 @@ import * as JB from '../engine/jobs.js';
 import * as PK from '../engine/poker.js';
 import * as D from '../engine/director.js';
 import { EVENTS } from '../data/events.js';
-import { WEAPONS, GOODS, SHOP, mkWeapon, mkGood, itemName } from '../data/items.js';
+import { SIDEQUESTS } from '../data/sidequests.js';
+import { WEAPONS, GOODS, ROPA, UPGRADES, HORSES, SHOP_ALMACEN, SHOP_ARMERO, SHOP_SASTRE,
+         mkWeapon, mkGood, mkRopa, itemName, itemDef, effAcc, effMag, effJam, effDurMax } from '../data/items.js';
 import { HERO_NAMES } from '../data/names.js';
 import { INTIM_LINES, ELI_TALKS, RECRUIT_TALKS, RUMORS, PET_LINES } from '../data/dialogs.js';
 import { startPrologue } from '../data/prologue.js';
@@ -22,6 +24,7 @@ let tab = 'cantina';
 let combatMode = null;   // null | 'shoot' | 'aim' | 'melee'
 let pk = null;           // estado de la mesa de póker
 let detailChar = null;   // ficha abierta en BANDA
+let mapaView = null;     // null | 'almacen' | 'armero' | 'sastre' | 'establo'
 
 const $ = id => document.getElementById(id);
 
@@ -30,7 +33,7 @@ export function init() {
     const b = e.target.closest('button[data-tab]');
     if (!b || CB.C) return;
     tab = b.dataset.tab;
-    pk = null; detailChar = null;
+    pk = null; detailChar = null; mapaView = null;
     renderAll();
   });
   CB.setOnUpdate(renderAll);
@@ -241,7 +244,7 @@ function cantinaAct(d) {
     for (const c of aliveSquad()) {
       for (const slot of ['weapon', 'blanca']) {
         const w = c.gear[slot];
-        if (w && !w.broken) w.dur = Math.min(WEAPONS[w.def].dur, w.dur + 6);
+        if (w && !w.broken) w.dur = Math.min(effDurMax(w), w.dur + 6);
       }
     }
     S.log('Aceite, trapo y paciencia. Los hierros lo agradecen.');
@@ -343,81 +346,256 @@ function renderPoker() {
   });
 }
 
-// ==================== MAPA ====================
+// ==================== MAPA: el pueblo entero ====================
 function mapa() {
   JB.maybeRefreshJobs();
+  JB.maybeRefreshWanted();
   const g = S.G;
-  let html = `<h2>🗺️ MARROW CREEK</h2><div class="flavor">${S.dateStr()} · El tablón cruje de trabajo feo.</div>`;
+  if (mapaView) { renderShop(mapaView); return; }
+  let html = `<h2>🗺️ MARROW CREEK</h2><div class="flavor">${S.dateStr()} · Barro, tablones y oportunidades feas.</div>`;
+
+  // El hilo principal
   if (g.flags.dawson === 2) {
     html += `<div class="card special"><div class="title">★ La pista de Dawson</div>
-      <div>Las colinas del norte. El hombre que enterró a Sam. Esto no es un trabajo.</div>
-      <div class="row"><span class="dim">2 días · sangriento</span><button data-dawson="1">Cabalgar</button></div></div>`;
+      <div class="small">Las colinas del norte. El hombre que enterró a Sam. Esto no es un trabajo.</div>
+      <div class="row"><span class="dim">2 días · sangriento · lleva a tu gente</span><button data-dawson="1">Cabalgar</button></div></div>`;
   }
+
+  // Historias únicas del territorio
+  if (g.sideOffer && SIDEQUESTS[g.sideOffer]) {
+    const q = SIDEQUESTS[g.sideOffer];
+    html += `<div class="card special"><div class="title">★ ${q.title}</div>
+      <div class="small">${q.hook}</div>
+      <div class="row"><span class="dim">historia única · no se repetirá</span>
+      <span><button data-sq="go">Escuchar</button> <button data-sq="skip">Ignorar</button></span></div></div>`;
+  }
+
+  // El tablón de trabajos
+  html += `<h3>📋 El tablón</h3>`;
   for (const j of g.jobs) {
     html += `<div class="card"><div class="title">${j.title}</div><div class="small">${j.desc}</div>
       <div class="row"><span class="dim">${j.days} día(s) · riesgo ${'☠'.repeat(j.risk)}${j.pay ? ` · $${j.pay}` : ''}</span>
       <button data-job="${j.id}">Aceptar</button></div></div>`;
   }
-  html += `<h3>🏪 Almacén</h3><div class="panel small">Munición: ${g.ammo.balas} balas, ${g.ammo.cartuchos} cartuchos.</div><div class="grid">`;
-  for (const id of SHOP) {
-    const def = WEAPONS[id] || GOODS[id];
-    html += `<button data-buy="${id}" ${g.money < def.price ? 'disabled' : ''}>${def.name} — $${def.price}<br><span class="dim small">${def.desc || ''}</span></button>`;
+
+  // WANTED
+  html += `<h3>🤠 Se busca — WANTED</h3>`;
+  if (!g.wanted.length) html += `<div class="panel small dim">El tablón de recompensas está vacío. El territorio anda tranquilo. Desconfía.</div>`;
+  for (const w of g.wanted) {
+    html += `<div class="card wanted"><div class="wtop">WANTED — VIVO O MUERTO</div>
+      <div class="wname">${w.name}</div>
+      <div class="small dim">Buscado por ${w.crime}.</div>
+      <div class="row"><span class="amber">Recompensa: $${w.bounty} (+50% vivo)</span>
+      <button data-wanted="${w.id}">Cazar</button></div></div>`;
   }
-  html += `</div><h3>Vender / reparar</h3><div class="grid">`;
-  g.stash.forEach((it, i) => {
-    const def = it.kind === 'weapon' ? WEAPONS[it.def] : GOODS[it.def];
-    if (it.kind === 'weapon' && it.broken) {
-      html += `<button data-fix="${i}" ${g.money < Math.ceil(def.price / 3) ? 'disabled' : ''}>Reparar ${def.name} — $${Math.ceil(def.price / 3)}</button>`;
-    } else if (def.price > 0) {
-      html += `<button data-sell="${i}">Vender ${itemName(it)} — $${Math.ceil(def.price / 2)}</button>`;
-    }
-  });
-  html += `</div>`;
+
+  // Los comercios
+  html += `<h3>🏘️ El pueblo</h3><div class="grid">
+    <button data-shop="almacen">🏪 Almacén<br><span class="dim small">Munición, vendas, whisky.</span></button>
+    <button data-shop="armero">🔧 Armería de Fitch<br><span class="dim small">Hierros, mejoras y reparaciones.</span></button>
+    <button data-shop="sastre">🎩 Sastrería Quill<br><span class="dim small">Sombreros, gabardinas, botas.</span></button>
+    <button data-shop="establo">🐎 Establo<br><span class="dim small">${g.horse ? g.horse.name + ' te espera dentro.' : 'Un caballo cambia la vida. Y la huida.'}</span></button>
+  </div>
+  <div class="panel small dim">Munición: ${g.ammo.balas} balas · ${g.ammo.cartuchos} cartuchos · $${g.money}</div>`;
+
   $('screen').innerHTML = html;
   $('screen').querySelectorAll('button[data-job]').forEach(b => b.onclick = () => {
     const j = g.jobs.find(x => x.id === +b.dataset.job);
     if (j) JB.startJob(j, showScene);
+  });
+  $('screen').querySelectorAll('button[data-wanted]').forEach(b => b.onclick = () => {
+    const w = g.wanted.find(x => x.id === +b.dataset.wanted);
+    if (w) JB.startWanted(w, showScene);
   });
   const dawsonBtn = $('screen').querySelector('button[data-dawson]');
   if (dawsonBtn) dawsonBtn.onclick = () => {
     g.flags.dawson = 2.5;
     JB.startJob({ tpl: 'dawson', id: -1, title: 'La pista de Dawson', days: 2, risk: 3, pay: 0 }, showScene);
   };
-  $('screen').querySelectorAll('button[data-buy]').forEach(b => b.onclick = () => buy(b.dataset.buy));
+  $('screen').querySelectorAll('button[data-sq]').forEach(b => b.onclick = () => {
+    if (b.dataset.sq === 'skip') {
+      g.sideOffer = null; g.sideDay = g.time.day;
+      S.log('Dejas pasar la historia. Quizá vuelva. Quizá.');
+      S.save(); renderAll();
+      return;
+    }
+    const q = SIDEQUESTS[g.sideOffer];
+    if (q) q.run(showScene);
+  });
+  $('screen').querySelectorAll('button[data-shop]').forEach(b => b.onclick = () => {
+    mapaView = b.dataset.shop; renderAll();
+  });
+}
+
+// ---------- comercios ----------
+function shopHeader(title, flavor) {
+  return `<button data-back="1">← Volver al pueblo</button>
+    <h2 style="margin-top:10px">${title}</h2><div class="flavor">${flavor}</div>`;
+}
+
+function renderShop(view) {
+  const g = S.G;
+  let html = '';
+
+  if (view === 'almacen') {
+    html = shopHeader('🏪 ALMACÉN', 'Huele a grano, cuerda y pólvora. Como debe ser.');
+    html += `<div class="panel small dim">Munición: ${g.ammo.balas} balas · ${g.ammo.cartuchos} cartuchos · Caja: $${g.money}</div><div class="grid">`;
+    for (const id of SHOP_ALMACEN) {
+      const d = GOODS[id];
+      html += `<button data-buy="good:${id}" ${g.money < d.price ? 'disabled' : ''}>${d.name} — $${d.price}<br><span class="dim small">${d.desc || ''}</span></button>`;
+    }
+    html += `</div><h3>Vender</h3><div class="grid">`;
+    g.stash.forEach((it, i) => {
+      if (it.kind !== 'weapon') {
+        const d = itemDef(it);
+        if (d.price > 0) html += `<button data-sell="${i}">Vender ${itemName(it)} — $${Math.ceil(d.price / 2)}</button>`;
+      }
+    });
+    html += `</div>`;
+  }
+
+  if (view === 'armero') {
+    html = shopHeader('🔧 ARMERÍA DE FITCH', 'Fitch habla poco y engrasa mucho. Sus precios muerden; su trabajo, jamás.');
+    html += `<h3>Comprar hierros</h3><div class="grid">`;
+    for (const id of SHOP_ARMERO) {
+      const d = WEAPONS[id];
+      html += `<button data-buy="weapon:${id}" ${g.money < d.price ? 'disabled' : ''}>${d.name} — $${d.price}<br><span class="dim small">${d.desc}</span></button>`;
+    }
+    html += `</div><h3>Mejorar (el arma es tuya para siempre)</h3>`;
+    const armas = [];
+    for (const c of aliveSquad()) {
+      if (c.gear.weapon && WEAPONS[c.gear.weapon.def].type !== 'blanca') armas.push({ w: c.gear.weapon, who: c.alias || c.name });
+    }
+    g.stash.forEach(it => { if (it.kind === 'weapon' && WEAPONS[it.def].type !== 'blanca') armas.push({ w: it, who: 'alforjas' }); });
+    if (!armas.length) html += `<div class="panel small dim">Nada que mejorar. Fitch bosteza.</div>`;
+    for (let ai = 0; ai < armas.length; ai++) {
+      const { w, who } = armas[ai];
+      w.up = w.up || [];
+      html += `<div class="card"><div class="title">${w.customName || WEAPONS[w.def].name} <span class="dim small">(${who})</span></div>
+        <div class="small dim">precisión ${effAcc(w)} · cargador ${effMag(w)} · estado ${w.broken ? '<span class="red">ROTA</span>' : w.dur + '/' + effDurMax(w)}${w.up.length ? ' · ' + w.up.map(u => UPGRADES[u].name).join(', ') : ''}</div>
+        <div class="grid" style="margin-top:6px">`;
+      for (const uid in UPGRADES) {
+        if (w.up.includes(uid)) continue;
+        const u = UPGRADES[uid];
+        html += `<button data-up="${ai}:${uid}" ${g.money < u.price ? 'disabled' : ''}>${u.name} — $${u.price}<br><span class="dim small">${u.desc}</span></button>`;
+      }
+      if (w.broken) {
+        const fix = Math.ceil(WEAPONS[w.def].price / 3) || 5;
+        html += `<button class="wide" data-fixw="${ai}" ${g.money < fix ? 'disabled' : ''}>Reparar — $${fix}</button>`;
+      }
+      html += `</div></div>`;
+    }
+    html += `<h3>Vender hierros</h3><div class="grid">`;
+    g.stash.forEach((it, i) => {
+      if (it.kind === 'weapon' && WEAPONS[it.def].price > 0) {
+        html += `<button data-sell="${i}">Vender ${itemName(it)} — $${Math.ceil(WEAPONS[it.def].price / 2)}</button>`;
+      }
+    });
+    html += `</div>`;
+    // guardar referencia para los handlers
+    renderShop._armas = armas;
+  }
+
+  if (view === 'sastre') {
+    html = shopHeader('🎩 SASTRERÍA QUILL', '«La ropa no hace al hombre», dice Quill, «pero decide quién dispara primero en las presentaciones.»');
+    html += `<div class="grid">`;
+    for (const id of SHOP_SASTRE) {
+      const d = ROPA[id];
+      const fx = Object.entries(d.fx || {}).map(([k, v]) => `+${v} ${k}`).join(', ');
+      html += `<button data-buy="ropa:${id}" ${g.money < d.price ? 'disabled' : ''}>${d.name} — $${d.price}<br><span class="dim small">${d.desc}${fx ? ' (' + fx + ')' : ''}</span></button>`;
+    }
+    html += `</div><div class="panel small dim">Para vestir a tu gente: BANDA → toca a alguien → Vestimenta.</div>`;
+  }
+
+  if (view === 'establo') {
+    html = shopHeader('🐎 EL ESTABLO', 'Heno, moscas y la mejor conversación del pueblo: la que no habla.');
+    if (g.horse) {
+      html += `<div class="card"><div class="title">🐎 ${g.horse.name}</div>
+        <div class="small">${HORSES[g.horse.def].name} · come $${g.horse.tier}/semana</div>
+        <div class="small dim">${g.horse.tier >= 3 ? 'Esquiva emboscadas y vuela en la huida.' : g.horse.tier >= 2 ? 'Da ventaja real al huir.' : 'Te lleva. Con eso basta, a veces.'}</div></div>`;
+      html += `<div class="panel small dim">Un jinete, un caballo. Si quieres otro, primero véndelo (mitad de precio) — o cuídalo hasta el final.</div>
+        <div class="grid"><button data-sellhorse="1">Vender a ${g.horse.name} — $${Math.ceil(HORSES[g.horse.def].price / 2)}</button></div>`;
+    } else {
+      html += `<div class="grid">`;
+      for (const id in HORSES) {
+        const h = HORSES[id];
+        html += `<button data-horse="${id}" ${g.money < h.price ? 'disabled' : ''}>${h.name} — $${h.price}<br><span class="dim small">${h.desc} Come $${h.tier}/semana.</span></button>`;
+      }
+      html += `</div>`;
+    }
+  }
+
+  $('screen').innerHTML = html;
+  const back = $('screen').querySelector('[data-back]');
+  if (back) back.onclick = () => { mapaView = null; renderAll(); };
+
+  $('screen').querySelectorAll('button[data-buy]').forEach(b => b.onclick = () => {
+    const [kind, id] = b.dataset.buy.split(':');
+    const d = kind === 'weapon' ? WEAPONS[id] : kind === 'ropa' ? ROPA[id] : GOODS[id];
+    if (g.money < d.price) return;
+    g.money -= d.price;
+    if (kind === 'good' && d.ammo) { g.ammo[d.ammo] += d.n; }
+    else if (kind === 'weapon') g.stash.push(mkWeapon(id));
+    else if (kind === 'ropa') g.stash.push(mkRopa(id));
+    else g.stash.push(mkGood(id));
+    S.log(`Compras ${d.name}.`);
+    S.save(); renderAll();
+  });
   $('screen').querySelectorAll('button[data-sell]').forEach(b => b.onclick = () => {
     const it = g.stash[+b.dataset.sell];
-    const def = it.kind === 'weapon' ? WEAPONS[it.def] : GOODS[it.def];
-    g.money += Math.ceil(def.price / 2);
+    const d = itemDef(it);
+    g.money += Math.ceil(d.price / 2);
     g.stash.splice(+b.dataset.sell, 1);
     S.log(`Vendes ${itemName(it)}.`);
     S.save(); renderAll();
   });
-  $('screen').querySelectorAll('button[data-fix]').forEach(b => b.onclick = () => {
-    const it = g.stash[+b.dataset.fix];
-    const def = WEAPONS[it.def];
-    g.money -= Math.ceil(def.price / 3);
-    it.broken = false; it.dur = Math.floor(def.dur * 0.7);
-    S.log(`${def.name} reparado. Casi como nuevo. Casi.`);
+  $('screen').querySelectorAll('button[data-up]').forEach(b => b.onclick = () => {
+    const [ai, uid] = b.dataset.up.split(':');
+    const entry = renderShop._armas[+ai];
+    if (!entry || g.money < UPGRADES[uid].price) return;
+    g.money -= UPGRADES[uid].price;
+    entry.w.up.push(uid);
+    if (uid === 'culata') entry.w.dur = Math.min(effDurMax(entry.w), entry.w.dur + 20);
+    S.log(`Fitch instala ${UPGRADES[uid].name.toLowerCase()} sin decir palabra. El arma respira distinto.`);
     S.save(); renderAll();
   });
-}
-
-function buy(id) {
-  const g = S.G;
-  const def = WEAPONS[id] || GOODS[id];
-  if (g.money < def.price) return;
-  g.money -= def.price;
-  if (GOODS[id] && GOODS[id].ammo) {
-    g.ammo[GOODS[id].ammo] += GOODS[id].n;
-    S.log(`Compras ${def.name}. Cada bala, un jornal.`);
-  } else if (WEAPONS[id]) {
-    g.stash.push(mkWeapon(id));
-    S.log(`Compras ${def.name}.`);
-  } else {
-    g.stash.push(mkGood(id));
-    S.log(`Compras ${def.name}.`);
-  }
-  S.save(); renderAll();
+  $('screen').querySelectorAll('button[data-fixw]').forEach(b => b.onclick = () => {
+    const entry = renderShop._armas[+b.dataset.fixw];
+    const fix = Math.ceil(WEAPONS[entry.w.def].price / 3) || 5;
+    if (g.money < fix) return;
+    g.money -= fix;
+    entry.w.broken = false;
+    entry.w.dur = Math.floor(effDurMax(entry.w) * 0.7);
+    S.log(`${WEAPONS[entry.w.def].name} reparado. Casi como nuevo. Casi.`);
+    S.save(); renderAll();
+  });
+  $('screen').querySelectorAll('button[data-horse]').forEach(b => b.onclick = () => {
+    const id = b.dataset.horse;
+    const h = HORSES[id];
+    if (g.money < h.price) return;
+    const name = (prompt('¿Cómo se va a llamar?', ['Trueno', 'Canela', 'Fantasma', 'Domingo'][Math.floor(Math.random() * 4)]) || 'Caballo').trim().slice(0, 20);
+    g.money -= h.price;
+    g.horse = { name, tier: h.tier, def: id };
+    S.log(`${name} es tuyo. Un ${h.name.toLowerCase()} con nombre ya no es un caballo: es familia.`);
+    S.journal(`Compré un ${h.name.toLowerCase()}. Se llama ${name}. Eli lo aprobó con un gruñido, que en su idioma es un abrazo.`);
+    S.save(); renderAll();
+  });
+  const sh = $('screen').querySelector('button[data-sellhorse]');
+  if (sh) sh.onclick = () => {
+    showScene({
+      title: '¿Vender a ' + g.horse.name + '?',
+      text: 'El del establo ya está contando el dinero. ' + g.horse.name + ' te mira por encima de la cerca, sin sospechar nada, que es lo peor.',
+      opts: [
+        { t: 'Venderlo', fx() {
+            g.money += Math.ceil(HORSES[g.horse.def].price / 2);
+            S.log(`Vendes a ${g.horse.name}. No miras atrás. Mentira: miras.`);
+            g.horse = null;
+            S.save();
+          } },
+        { t: 'No. Ni hablar.' }
+      ]
+    }, () => renderAll());
+  };
 }
 
 // ==================== BANDA ====================
@@ -466,7 +644,7 @@ function charDetail(id) {
   if (c.wounds.length) html += `<h3>Secuelas</h3><div class="panel small red">${c.wounds.join(' · ')}</div>`;
   const w = c.gear.weapon;
   html += `<h3>Armamento</h3><div class="panel small">
-    Arma: ${w ? `${w.customName || WEAPONS[w.def].name} · estado ${w.broken ? '<span class="red">ROTA</span>' : w.dur + '%'} · cargada ${w.load}/${WEAPONS[w.def].mag || 0}` : 'ninguna'}<br>
+    Arma: ${w ? `${w.customName || WEAPONS[w.def].name} · estado ${w.broken ? '<span class="red">ROTA</span>' : w.dur + '/' + effDurMax(w)} · cargada ${w.load}/${effMag(w)}${(w.up || []).length ? ' · ' + w.up.map(u => UPGRADES[u].name).join(', ') : ''}` : 'ninguna'}<br>
     Acero: ${c.gear.blanca ? WEAPONS[c.gear.blanca.def].name : 'ninguno'}</div><div class="grid">`;
   g.stash.forEach((it, i) => {
     if (it.kind === 'weapon' && !it.broken && WEAPONS[it.def].type !== 'blanca') {
@@ -483,6 +661,28 @@ function charDetail(id) {
     }
     if (it.kind === 'good' && it.def === 'whisky') {
       html += `<button data-wsk="${i}">Whisky de alforja (−12 estrés)</button>`;
+    }
+  });
+  html += `</div>`;
+
+  // ---- vestimenta: el espejo del sastre ----
+  const SLOTS = { sombrero: 'Sombrero', gabardina: 'Gabardina', botas: 'Botas', accesorio: 'Accesorio' };
+  c.ropa = c.ropa || { sombrero: null, gabardina: null, botas: null, accesorio: null };
+  html += `<h3>Vestimenta</h3><div class="espejo">`;
+  if (c.sprite) html += `<img src="${c.sprite}" onerror="this.remove()">`;
+  html += `<div class="slots">`;
+  for (const slot in SLOTS) {
+    const it = c.ropa[slot];
+    const d = it ? ROPA[it.def] : null;
+    const fx = d && d.fx ? Object.entries(d.fx).map(([k, v]) => `+${v} ${k.slice(0, 4)}`).join(' ') : '';
+    html += `<div class="slotrow"><b>${SLOTS[slot]}</b><span>${d ? d.name + (fx ? ` <em class="dim">${fx}</em>` : '') : '<span class="dim">—</span>'}</span>
+      ${it ? `<button data-unrop="${slot}">Quitar</button>` : ''}</div>`;
+  }
+  html += `</div></div><div class="grid">`;
+  g.stash.forEach((it, i) => {
+    if (it.kind === 'ropa') {
+      const d = ROPA[it.def];
+      html += `<button data-rop="${i}">Ponerse ${d.name}</button>`;
     }
   });
   html += `</div>`;
@@ -512,7 +712,7 @@ function charDetail(id) {
   });
   $('screen').querySelectorAll('button[data-kit]').forEach(b => b.onclick = () => {
     const i = +b.dataset.kit, it = g.stash[i];
-    w.dur = Math.min(WEAPONS[w.def].dur, w.dur + 25);
+    w.dur = Math.min(effDurMax(w), w.dur + 25);
     it.uses--;
     if (it.uses <= 0) g.stash.splice(i, 1);
     S.save(); renderAll();
@@ -521,6 +721,20 @@ function charDetail(id) {
     const i = +b.dataset.wsk;
     g.stash.splice(i, 1);
     addStress(c, -12);
+    S.save(); renderAll();
+  });
+  $('screen').querySelectorAll('button[data-rop]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.rop, it = g.stash[i];
+    const slot = ROPA[it.def].slot;
+    g.stash.splice(i, 1);
+    if (c.ropa[slot]) g.stash.push(c.ropa[slot]);
+    c.ropa[slot] = it;
+    S.log(`${c.alias || c.name} estrena ${ROPA[it.def].name.toLowerCase()}.`);
+    S.save(); renderAll();
+  });
+  $('screen').querySelectorAll('button[data-unrop]').forEach(b => b.onclick = () => {
+    const slot = b.dataset.unrop;
+    if (c.ropa[slot]) { g.stash.push(c.ropa[slot]); c.ropa[slot] = null; }
     S.save(); renderAll();
   });
 }
@@ -532,12 +746,17 @@ function diario() {
   html += `<h3>⚰️ El cementerio</h3>`;
   if (!g.cemetery.length) html += `<div class="panel small dim">Aún no has enterrado a nadie. Disfrútalo mientras dure.</div>`;
   for (const t of [...g.cemetery].reverse()) {
-    html += `<div class="grave"><div class="gname">${t.name}${t.alias ? ' «' + t.alias + '»' : ''} (${t.born}–${t.died})</div>
+    html += `<div class="grave"><div class="gname">${t.animal ? t.animal + ' ' : ''}${t.name}${t.alias ? ' «' + t.alias + '»' : ''}${t.born ? ` (${t.born}–${t.died})` : ''}</div>
       <div class="small">${t.cause}</div>${t.epitaph ? `<div class="gep">${t.epitaph}</div>` : ''}</div>`;
   }
   html += `<h3>Memorias</h3>`;
   for (const j of [...g.journal].reverse().slice(0, 30)) {
     html += `<div class="panel small"><span class="dim">${S.dateStr(j.d)}</span><br>${j.t}</div>`;
+  }
+  html += `<h3>🎯 Decisiones que pesan</h3>`;
+  if (!g.choices.length) html += `<div class="panel small dim">Todavía no has tomado ninguna de las grandes. Llegarán. Siempre llegan.</div>`;
+  for (const ch of [...g.choices].reverse().slice(0, 25)) {
+    html += `<div class="panel small"><span class="dim">${S.dateStr(ch.d)}</span><br>${ch.t}</div>`;
   }
   html += `<h3>Cuentas de una vida</h3><div class="panel small">
     Días en el territorio: ${g.stats.days} · Trabajos: ${g.stats.jobs} · Disparos: ${g.stats.shots} · Muertes a tu cuenta: ${g.stats.kills}<br>
@@ -611,7 +830,7 @@ function renderCombat() {
       <div class="uname">${u.name}</div>
       <div class="tags">${u.dead ? '✝' : u.out ? 'caído' : `${u.hp}/${u.hpMax}`}
       ${!u.dead && !u.out ? ` · ${u.rank === 'f' ? 'delante' : 'atrás'}${u.cover ? ' · 🪨' : ''}${u.shaken ? ' · 😨' : ''}
-      ${w ? ` · ${w.load}/${WEAPONS[w.def].mag || 0}${w.broken ? ' ROTA' : u.jam ? ' ⚙ENCASQ.' : ''}` : ''}` : ''}</div></div>`;
+      ${w ? ` · ${w.load}/${effMag(w)}${w.broken ? ' ROTA' : u.jam ? ' ⚙ENCASQ.' : ''}` : ''}` : ''}</div></div>`;
   }
   html += `</div><div class="clog">${C.log.slice(-12).map(l => `<div>${l}</div>`).join('')}</div>`;
 
@@ -637,7 +856,7 @@ function renderCombat() {
       html += `<button data-c="shoot" ${canShoot ? '' : 'disabled'}>🔫 Disparar</button>`;
       html += `<button data-c="aim" ${canShoot ? '' : 'disabled'}>🎯 Apuntar y disparar</button>`;
       if (u.jam) html += `<button data-c="unjam">⚙ Desencasquillar</button>`;
-      if (u.w && !u.w.broken && wd && u.w.load < (wd.mag || 0)) html += `<button data-c="reload">↻ Recargar (${S.G.ammo[wd.ammo] || 0} ${wd.ammo})</button>`;
+      if (u.w && !u.w.broken && wd && u.w.load < effMag(u.w)) html += `<button data-c="reload">↻ Recargar (${S.G.ammo[wd.ammo] || 0} ${wd.ammo})</button>`;
       if (u.blanca && u.rank === 'f') html += `<button data-c="melee">🔪 Acero</button>`;
       if (!u.cover) html += `<button data-c="cover">🪨 Cubrirse</button>`;
       html += `<button data-c="move">${u.rank === 'f' ? '↩ Retroceder' : '↪ Avanzar'}</button>`;

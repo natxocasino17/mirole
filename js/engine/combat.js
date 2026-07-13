@@ -3,10 +3,10 @@
 // el miedo desarma a los flojos y las heridas dejan secuelas de por vida.
 // El primer nombre de la dinastía no muere de una bala perdida: se
 // convierte en mito (malherido o coma). Los demás... los demás sí.
-import { G, log, save, journal } from './state.js';
+import { G, log, save, journal, yearOf } from './state.js';
 import { rand, rint, chance, pick } from './rng.js';
-import { WEAPONS, GOODS, LOOT_GOODS, mkGood, mkWeapon } from '../data/items.js';
-import { addXp, addStress, applyWound, activeSquad, buryChar } from './chars.js';
+import { WEAPONS, GOODS, ROPA, LOOT_GOODS, LOOT_TALISMANS, mkGood, mkRopa, mkWeapon, effAcc, effMag, effJam } from '../data/items.js';
+import { addXp, addStress, applyWound, activeSquad, buryChar, bonus } from './chars.js';
 import { INTIM_LINES, FAREWELLS } from '../data/dialogs.js';
 
 export let C = null;
@@ -14,11 +14,12 @@ let onUpdate = () => {};
 export function setOnUpdate(fn) { onUpdate = fn; }
 
 function pcUnit(ch) {
+  // Los tuyos empiezan a cubierto: no sois novatos, sois supervivientes.
   return {
     kind: 'pc', id: ch.id, name: ch.alias || ch.name, ch,
     hp: ch.hp, hpMax: ch.hpMax, sk: ch.skills,
     w: ch.gear.weapon, blanca: ch.gear.blanca,
-    rank: 'f', cover: false, shaken: 0, jam: false,
+    rank: 'f', cover: true, shaken: 0, jam: false,
     out: false, fled: false, dead: false
   };
 }
@@ -59,7 +60,7 @@ function nextRound() {
   C.round++;
   C.order = C.units
     .filter(u => !u.dead && !u.out && !u.fled)
-    .map(u => ({ u, i: u.sk.reflejos + rint(0, 20) }))
+    .map(u => ({ u, i: u.sk.reflejos + (u.kind === 'pc' ? bonus(u.ch, 'reflejos') : 0) + rint(0, 20) }))
     .sort((a, b) => b.i - a.i)
     .map(o => o.u);
   C.idx = -1;
@@ -97,7 +98,7 @@ function checkEnd() {
 function fireShot(att, tgt, aimed) {
   const w = att.w, wd = WEAPONS[w.def];
   // Encasquillamiento: el porcentaje de estado del arma decide, a mitad de turno.
-  const jamP = wd.jam + Math.max(0, 70 - w.dur) * 0.004;
+  const jamP = effJam(w) + Math.max(0, 70 - w.dur) * 0.004;
   if (chance(jamP)) {
     att.jam = true;
     w.dur = Math.max(0, w.dur - 2);
@@ -110,11 +111,14 @@ function fireShot(att, tgt, aimed) {
   if (att.kind === 'pc') { G.stats.shots++; addXp(att.ch, 'punteria', 1); }
 
   const d = dist(att, tgt);
-  let acc = wd.acc + att.sk.punteria * 0.5 + (aimed ? 15 : 0) + (wd.mods ? wd.mods[d] : 0)
+  let acc = effAcc(w) + att.sk.punteria * 0.5 + (aimed ? 15 : 0) + (wd.mods ? wd.mods[d] : 0)
           - (tgt.cover ? 20 : 0) - (att.shaken ? 20 : 0);
   if (att.kind === 'pc') {
+    acc += bonus(att.ch, 'punteria');
     if (att.ch.stress > 70) acc -= 10;
     if (att.ch.wounds.some(x => x.includes('Brazo'))) acc -= 5;
+  } else {
+    acc -= 6; // los matones disparan con el hígado, no con el ojo
   }
   acc = Math.max(5, Math.min(95, acc));
 
@@ -179,6 +183,16 @@ function destino(u) {
   u.hp = 0;
   u.ch.hp = 1;
   for (const p of pcsAlive()) if (p !== u) addStress(p.ch, 8);
+  // ☽ La moneda del ahorcado: la muerte no cobra dos veces la misma moneda.
+  const amuleto = u.ch.ropa && u.ch.ropa.accesorio;
+  if (amuleto && ROPA[amuleto.def] && ROPA[amuleto.def].luck && !amuleto.spent) {
+    amuleto.spent = true;
+    u.out = true;
+    u.ch.recoverUntil = G.time.day + rint(5, 12);
+    clog(`☽ ${u.name} cae... y la bala se desvía en algo metálico del bolsillo. La moneda del ahorcado, partida en dos.`);
+    journal(`La moneda del ahorcado pagó su deuda: ${u.name} debería estar bajo tierra y está roncando en el catre. No pienso preguntar.`);
+    return;
+  }
   if (isPlayer && !G.flags.mythBroken) {
     // El primer nombre no muere de una bala perdida. Se convierte en mito.
     u.out = true;
@@ -264,13 +278,14 @@ export function actMove() {
 export function actReload() {
   if (!isPcTurn()) return;
   const u = C.active, wd = WEAPONS[u.w.def];
-  const need = wd.mag - u.w.load;
+  const mag = effMag(u.w);
+  const need = mag - u.w.load;
   const have = G.ammo[wd.ammo] || 0;
   const put = Math.min(need, have);
   if (put <= 0) { clog(`${u.name} palpa el cinto: no quedan ${wd.ammo}.`); endTurn(); return; }
   G.ammo[wd.ammo] -= put;
   u.w.load += put;
-  clog(`${u.name} recarga (${u.w.load}/${wd.mag}).`);
+  clog(`${u.name} recarga (${u.w.load}/${mag}).`);
   endTurn();
 }
 export function actUnjam() {
@@ -308,7 +323,8 @@ export function actFlee() {
   if (!isPcTurn() || !C.canFlee) return;
   const team = pcsAlive();
   const avg = team.reduce((n, p) => n + p.sk.reflejos, 0) / team.length;
-  if (avg + rint(0, 20) >= 50) {
+  const horseBonus = G.horse && G.horse.tier >= 2 ? 10 : 0;
+  if (avg + horseBonus + rint(0, 20) >= 50) {
     clog('Os fundís entre el polvo y los callejones.');
   } else {
     clog('La huida es torpe. El plomo os despide.');
@@ -356,6 +372,13 @@ function winCombat() {
     C.lootItems.push('★ Moneda marcada');
     journal('En el bolsillo de un muerto: una moneda marcada. El dedo te pide guardarla. La guardas.');
   }
+  // ☽ Talismanes: 0.4%. El territorio decide cuándo, no tú.
+  if (chance(0.004)) {
+    const t = pick(LOOT_TALISMANS);
+    G.stash.push(mkRopa(t));
+    C.lootItems.push(ROPA[t].name);
+    journal(`Entre las pertenencias de un muerto: ${ROPA[t].name.toLowerCase()}. Pesa más de lo que debería. Lo guardas de todos modos.`);
+  }
   G.rep.fama = Math.min(100, G.rep.fama + 1 + Math.floor(C.kills / 2));
 }
 
@@ -365,6 +388,14 @@ function loseCombat() {
   const cut = Math.ceil(G.money / 2);
   G.money -= cut;
   clog(`Todo se vuelve negro. Despertáis desplumados: −$${cut}.`);
+  // A veces la derrota se cobra al caballo. El Oeste no perdona ni a los inocentes.
+  if (G.horse && chance(0.12)) {
+    clog(`✝ ${G.horse.name} no se levanta del camino.`);
+    G.cemetery.push({ name: G.horse.name, animal: '🐎', died: yearOf(G.time.day), day: G.time.day,
+      cause: 'Cayó en la derrota', epitaph: 'Corrió hasta el final. Como todos los buenos.' });
+    journal(`${G.horse.name} murió en el camino. Los caballos no eligen las guerras de sus jinetes.`);
+    G.horse = null;
+  }
 }
 
 export function finish() {

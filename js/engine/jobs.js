@@ -1,7 +1,8 @@
 // MIROLE — trabajos. El tablón de Marrow Creek: escoltas, deudas,
 // recompensas, contrabando. Cada trabajo es una sesión: viaje, decisión,
 // a veces plomo, y volver a casa con algo — o sin alguien.
-import { G, log, journal, save, dateStr } from './state.js';
+import { G, log, journal, save, choice, markOnce } from './state.js';
+import { OUTLAWS } from '../data/names.js';
 import { rint, pick, chance } from './rng.js';
 import { mkFoe, foesForRisk } from '../data/enemies.js';
 import { addXp, addStress, player, activeSquad } from './chars.js';
@@ -15,13 +16,105 @@ export function maybeRefreshJobs() {
 }
 
 export function genJobs() {
-  const pool = ['escolta', 'deuda', 'recompensa', 'guardia', 'contrabando', 'nido'];
+  // Las recompensas viven ahora en el tablón WANTED, no aquí.
+  const pool = ['escolta', 'deuda', 'guardia', 'contrabando', 'nido'];
   G.jobs = [];
   for (let i = 0; i < 3 && pool.length; i++) {
     const idx = rint(0, pool.length - 1);
     G.jobs.push(genJob(pool.splice(idx, 1)[0]));
   }
   G.jobsDay = G.time.day;
+}
+
+// ---------- el tablón WANTED ----------
+// Carteles con nombre y apellido. Cada forajido muere UNA vez: el tablón
+// no recicla muertos. Cada tantos días, el territorio produce uno nuevo.
+const CRIMES = ['asalto al correo de Blackvein', 'triple asesinato en Dry Creek',
+  'incendio del rancho Whitlock', 'robo de ganado a punta de rifle',
+  'la masacre de la diligencia del norte', 'asesinato de un ayudante del sheriff',
+  'secuestro de la hija del ferroviario', 'desvalijar la iglesia de Bent Fork'];
+
+export function maybeRefreshWanted() {
+  if (G.wanted.length >= 3) return;
+  if (G.time.day - G.wantedDay < 8 && G.wanted.length > 0) return;
+  const used = G.wanted.map(w => w.name);
+  const names = OUTLAWS.filter(n => !used.includes(n) && !G.once.includes('w_' + n));
+  if (!names.length) return;
+  const name = pick(names);
+  const tier = G.rep.fama >= 30 ? rint(2, 3) : rint(1, 2) + 1;
+  G.wanted.push({
+    id: rint(1000, 999999), name, tier,
+    crime: pick(CRIMES),
+    bounty: 50 + tier * 20 + rint(0, 30) + Math.floor(G.rep.fama / 2)
+  });
+  G.wantedDay = G.time.day;
+}
+
+export function startWanted(poster, sceneFn) {
+  G.wanted = G.wanted.filter(w => w.id !== poster.id);
+  sceneFn({
+    title: `WANTED: ${poster.name}`,
+    text: `El cartel lo acusa de ${poster.crime}. $${poster.bounty}, vivo o muerto. Vivo paga la mitad extra.\n\nLo vieron por las tierras malas del este. Los carteles nunca mienten en eso: los forajidos siempre están donde nadie quiere ir.`,
+    opts: [{ t: 'Salir a cazar' }]
+  }, () => {
+    travel(1);
+    const boss = mkFoe('veterano', poster.name);
+    boss.sk.voluntad = 85;
+    boss.hp = boss.hpMax = 7;
+    const foes = poster.tier >= 3
+      ? [boss, mkFoe('pistolero'), mkFoe('matarife')]
+      : [boss, mkFoe('maton')];
+    dogWarning(foes);
+    CB.startCombat({
+      title: `Caza: ${poster.name}`, foes,
+      intro: 'Su campamento apesta a whisky malo y a gente que ya no espera vivir mucho. Te ven llegar.',
+      onEnd: (res) => {
+        travel(1);
+        if (res !== 'win') {
+          G.wanted.push(poster); // el cartel vuelve al tablón, burlándose
+          log(`${poster.name} sigue respirando. El cartel sigue en el tablón.`);
+          save();
+          return;
+        }
+        markOnce('w_' + poster.name);
+        sceneFn({
+          title: 'Está en el suelo',
+          text: `${poster.name} respira sangre, apoyado en su silla de montar. Te mira sin pedir nada.\n\n«Acaba o cárgame en el caballo, muchacho. Pero decide tú, que para eso ganaste.»`,
+          opts: [
+            { t: `Llevarlo vivo (+$${Math.round(poster.bounty * 0.5)} extra)`, fx() {
+                G.money += Math.round(poster.bounty * 1.5);
+                G.stats.earned += Math.round(poster.bounty * 1.5);
+                G.stats.jobs++;
+                G.fac.ley += 5;
+                G.rep.humanidad = Math.min(100, G.rep.humanidad + 2);
+                choice(`Entregué vivo a ${poster.name}.`);
+                save();
+                return 'Cruza el pueblo atado y erguido, saludando a las señoras como si fuera un desfile. El juez paga el extra. Casi te cae bien el desgraciado.';
+              } },
+            { t: 'Rematarlo aquí', fx() {
+                G.money += poster.bounty;
+                G.stats.earned += poster.bounty;
+                G.stats.jobs++;
+                G.rep.humanidad = Math.max(0, G.rep.humanidad - 8);
+                G.rep.fama = Math.min(100, G.rep.fama + 3);
+                addStress(player(), 4);
+                choice(`Rematé a ${poster.name} en el suelo.`);
+                save();
+                return 'Un disparo. Los cuervos aplauden. El cuerpo pesa menos que la cifra del cartel, y tú pesas un poco más por dentro.';
+              } }
+          ]
+        }, () => {});
+      }
+    });
+  });
+}
+
+// El perro huele el plomo antes de que hable: los emboscadores llegan nerviosos.
+function dogWarning(foes) {
+  if (G.pets.length && chance(0.3)) {
+    for (const f of foes) f.shaken = 1;
+    log(`${G.pets[0].name} gruñó a tiempo. Llegan nerviosos.`);
+  }
 }
 
 function genJob(tpl) {
@@ -85,9 +178,13 @@ const RUNNERS = {
       opts: [{ t: 'Partir al alba' }]
     }, () => {
       travel(1);
-      if (chance(0.65)) {
+      // Un buen caballo esquiva problemas; un buen perro los anuncia.
+      const ambushP = G.horse && G.horse.tier >= 3 ? 0.5 : 0.65;
+      if (chance(ambushP)) {
+        const foes = foesForRisk(job.risk);
+        dogWarning(foes);
         CB.startCombat({
-          title: 'Emboscada en el camino', foes: foesForRisk(job.risk), canPay: true,
+          title: 'Emboscada en el camino', foes, canPay: true,
           intro: 'Salen de detrás de las rocas como si el desierto los pariera. Quieren la carga.',
           onEnd: (res) => {
             travel(1);
@@ -228,8 +325,10 @@ const RUNNERS = {
       opts: [{ t: 'Entrar con la primera luz' }]
     }, () => {
       travel(1);
+      const foes = foesForRisk(3);
+      dogWarning(foes);
       CB.startCombat({
-        title: 'El rancho quemado', foes: foesForRisk(3),
+        title: 'El rancho quemado', foes,
         intro: 'El centinela bosteza. Es lo último aburrido que va a pasar aquí.',
         onEnd: (res) => {
           travel(1);
@@ -253,7 +352,7 @@ const RUNNERS = {
     }, () => {
       travel(1);
       CB.startCombat({
-        title: 'Los perros de Dawson', foes: [mkFoe('pistolero'), mkFoe('pistolero'), mkFoe('matarife')], canFlee: false,
+        title: 'Los perros de Dawson', foes: [mkFoe('pistolero'), mkFoe('maton'), mkFoe('matarife')], canFlee: false,
         intro: 'Dawson compró guardaespaldas con tu dinero. Con el dinero de Sam.',
         onEnd: (res) => {
           if (res !== 'win') { travel(1); G.flags.dawson = 2; log('Las colinas te escupieron de vuelta. Dawson sigue respirando. Por ahora.'); save(); return; }
@@ -262,6 +361,7 @@ const RUNNERS = {
             text: 'Está de rodillas junto a la chimenea, más viejo de lo que lo recordabas, sosteniendo las manos como si rezara a un dios que no conoce.\n\n«Fue un negocio, muchacho. Nada personal. Sam entendía de negocios...»\n\nSe calla. Hasta él sabe que eso fue un error.',
             opts: [
               { t: 'Matarlo a sangre fría', fx() {
+                  choice('Maté a Silas Dawson a sangre fría, de rodillas junto a su chimenea.');
                   G.flags.dawson = 3; G.flags.dawsonFate = 'muerto';
                   G.rep.humanidad = Math.max(0, G.rep.humanidad - 15);
                   G.rep.fama = Math.min(100, G.rep.fama + 6);
@@ -270,12 +370,14 @@ const RUNNERS = {
                   return 'El disparo suena a punto final. Te quedas mirando la chimenea hasta que el fuego se acaba.\n\nCreías que esto pesaría menos. Pesa distinto, que no es lo mismo.';
                 } },
               { t: 'Entregarlo a la ley ($120)', fx() {
+                  choice('Entregué a Silas Dawson vivo a la justicia de Blackvein.');
                   G.flags.dawson = 3; G.flags.dawsonFate = 'entregado';
                   G.money += 120; G.stats.earned += 120; G.fac.ley += 10;
                   journal('Dawson colgará en Blackvein, con papeles y jueces. Sam habría dicho que la horca ajena no abriga. Pero pagaron bien.');
                   return 'Cruza el territorio atado, lloriqueando sobre negocios. El juez de Blackvein paga la recompensa completa.\n\nLa horca hará el resto. Tú ya hiciste bastante.';
                 } },
               { t: 'Dejarlo ir, vivo y avisado', fx() {
+                  choice('Dejé vivo a Silas Dawson. La promesa quedó rota; yo, entero.');
                   G.flags.dawson = 3; G.flags.dawsonFate = 'vivo';
                   G.rep.humanidad = Math.min(100, G.rep.humanidad + 10);
                   journal('Dejaste vivo a Dawson. No por él. Por ti. Sam lo entendería... probablemente. Ojalá.');

@@ -5,7 +5,7 @@
 // leyenda hay años, no semanas.
 import { G, log, journal, yearOf } from './state.js';
 import { rint, pick, chance } from './rng.js';
-import { mkWeapon } from '../data/items.js';
+import { mkWeapon, ROPA } from '../data/items.js';
 import { FIRST, LAST, APODOS, TRAITS, SECRETS } from '../data/names.js';
 
 export const SKILLS = ['punteria', 'reflejos', 'voluntad', 'vigor', 'labia', 'sigilo'];
@@ -25,7 +25,8 @@ function makeChar(o) {
     xp: {}, traits: [], wounds: [], secret: null,
     loyalty: 50, salario: 0, bioTier: 0,
     gear: { weapon: null, blanca: null },
-    recoverUntil: 0, alive: true, portrait: ''
+    ropa: { sombrero: null, gabardina: null, botas: null, accesorio: null },
+    recoverUntil: 0, alive: true, portrait: '', sprite: ''
   }, o);
 }
 
@@ -36,7 +37,8 @@ export function makeProtagonist(name, alias) {
     hp: 8, hpMax: 8,
     skills: { punteria: 42, reflejos: 44, voluntad: 40, vigor: 42, labia: 32, sigilo: 30 },
     gear: { weapon: mkWeapon('colt_oxidado'), blanca: mkWeapon('navaja') },
-    portrait: 'assets/portraits/vane.png'
+    portrait: 'assets/portraits/vane.png',
+    sprite: 'assets/sprites/vane_full.png'
   });
 }
 
@@ -131,6 +133,17 @@ export function applyWound(ch, where) {
     ch.wounds.push(w);
     log(`${ch.id === G.player ? 'Cargarás' : (ch.alias || ch.name) + ' cargará'} con esa herida para siempre: ${w.toLowerCase()}.`);
   }
+}
+
+// La ropa y los talismanes suman bonos pasivos pequeños pero reales.
+export function bonus(ch, key) {
+  let n = 0;
+  if (!ch.ropa) return 0;
+  for (const slot of ['sombrero', 'gabardina', 'botas', 'accesorio']) {
+    const it = ch.ropa[slot];
+    if (it && ROPA[it.def] && ROPA[it.def].fx) n += ROPA[it.def].fx[key] || 0;
+  }
+  return n;
 }
 
 // ---------- consultas ----------

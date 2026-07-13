@@ -4,8 +4,8 @@
 // migraciones de esquema viven aquí para siempre.
 import { seedRng, rngState, setRngState } from './rng.js';
 
-export const SCHEMA = 1;
-export const VERSION = '0.1.0';
+export const SCHEMA = 2;
+export const VERSION = '0.2.0';
 const KEY = 'mirole_save';
 
 export let G = null;
@@ -22,8 +22,11 @@ export function baseState() {
     rep: { fama: 0, humanidad: 55 },
     fac: { ley: 0, mineros: 0, forajidos: 0, pueblo: 0 },
     jobs: [], jobsDay: -99,
+    wanted: [], wantedDay: -99,
+    sideOffer: null, sideDay: -99,
+    choices: [],
     daily: { day: 0, whisky: 0, talks: [], clean: false, rumor: false, pet: false },
-    pets: [],
+    pets: [], horse: null,
     cemetery: [], journal: [], log: [],
     flags: {}, pending: [], once: [],
     stats: { kills: 0, jobs: 0, days: 0, shots: 0, pokerWon: 0, pokerLost: 0, earned: 0 }
@@ -57,10 +60,26 @@ export function load() {
 export function wipe() { localStorage.removeItem(KEY); G = null; }
 
 export function migrate(s) {
-  // Aquí vivirán las migraciones durante décadas:
-  // if (s.schema === 1) { ...transformar... ; s.schema = 2; }
+  // Aquí viven las migraciones. Una partida de 2026 abre en 2060.
+  if (s.schema === 1) {
+    s.wanted = []; s.wantedDay = -99;
+    s.sideOffer = null; s.sideDay = -99;
+    s.choices = []; s.horse = null;
+    for (const id in s.chars) {
+      const c = s.chars[id];
+      if (!c.ropa) c.ropa = { sombrero: null, gabardina: null, botas: null, accesorio: null };
+      for (const slot of ['weapon', 'blanca']) {
+        if (c.gear && c.gear[slot] && !c.gear[slot].up) c.gear[slot].up = [];
+      }
+    }
+    for (const it of s.stash || []) if (it.kind === 'weapon' && !it.up) it.up = [];
+    s.schema = 2;
+  }
   return s;
 }
+
+// Las decisiones que pesan: el registro estilo diagrama de una vida.
+export function choice(t) { G.choices.push({ d: G.time.day, t }); }
 
 // ---------- calendario ----------
 export const SEASONS = ['Primavera', 'Verano', 'Otoño', 'Invierno'];
