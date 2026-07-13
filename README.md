@@ -68,6 +68,23 @@ Su función: cuando dentro de meses o años quieras una expansión, ábrele una
 sesión a Claude y dile *«lee la biblia y continúa mi historia»* junto con tu
 JSON de guardado. Él sabrá qué hacer.
 
+## ¿Y si algún día ya no hay Claude?
+
+El juego está blindado para sobrevivir a todo, incluida la IA que lo escribió:
+
+1. **Nunca se apaga.** Es HTML/JS puro, corre offline en tu teléfono para
+   siempre, sin servidores. Los sistemas (Director, trabajos, traiciones,
+   economía, envejecimiento) generan juego infinito sin actualizaciones.
+2. **Cualquier IA puede heredarlo.** Dale a cualquier IA competente la
+   biblia (`docs/world-bible.b64`), tu save y el repo: dentro de la biblia
+   hay un PROTOCOLO DE TEMPORADAS con instrucciones exactas de cómo
+   continuar tu historia con la misma densidad, giros y reglas de canon.
+3. **Hasta un humano puede.** Los eventos e historias son texto con
+   opciones en `js/data/` — copiar uno, cambiar el texto y añadirlo al
+   pool es todo lo que hace falta.
+4. **Guarda copias.** De vez en cuando descarga el repo entero (Code →
+   Download ZIP) y guárdalo con tus saves. GitHub también es mortal.
+
 ## Para futuras expansiones (arquitectura modular)
 
 - `js/engine/` — el motor: combate, tiempo, personajes, Director. Estable.
