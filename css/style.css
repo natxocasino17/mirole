@@ -184,17 +184,27 @@ img.bigface{width:110px; height:110px; object-fit:cover; border:3px solid var(--
 .qd-foe{position:absolute; font-size:52px; cursor:crosshair; user-select:none;}
 .range-arena.done{opacity:.85;}
 
+/* la cabalgata interactiva */
+.range-arena.chase{background:linear-gradient(#2a2418 0%, #1a1610 60%, #241d12 60%); overflow:hidden;}
+.range-arena.chase.shake{animation:shk .2s;}
+@keyframes shk{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.rider{position:absolute; left:10%; top:52%; font-size:44px; z-index:2; transform:scaleX(-1);}
+.flyer{position:absolute; font-size:34px; cursor:crosshair; user-select:none;}
+.flyer.foe{font-size:38px;}
+
 /* la gallera */
 .gallera-arena{
   position:relative; height:90px; background:#241d12; border:2px solid var(--line);
   margin-bottom:8px; display:flex; align-items:center; justify-content:space-around;
 }
-.gallo{font-size:44px; transition:transform .2s;}
-.gallo.flip{transform:scaleX(-1);}
-.gallo.peck{animation:peck .5s;}
-@keyframes peck{40%{transform:translateX(26px) rotate(18deg)} 100%{transform:none}}
-.gallo.flip.peck{animation:peckf .5s;}
-@keyframes peckf{40%{transform:scaleX(-1) translateX(26px) rotate(18deg)} 100%{transform:scaleX(-1)}}
+.gallo-wrap{display:flex; flex-direction:column; align-items:center; gap:2px;}
+.gallo{font-size:44px;}
+.gallo.faceR{transform:scaleX(-1);}    /* el de la izquierda mira a la derecha */
+.gallo.faceL{transform:none;}          /* el de la derecha mira a la izquierda */
+.gallo.faceR.peck{animation:peckR .5s;}
+@keyframes peckR{40%{transform:scaleX(-1) translateX(-24px) rotate(-14deg)} 100%{transform:scaleX(-1)}}
+.gallo.faceL.peck{animation:peckL .5s;}
+@keyframes peckL{40%{transform:translateX(-24px) rotate(14deg)} 100%{transform:none}}
 
 /* el mapa del territorio */
 .tmap{background:#1b1712; border:3px double var(--amber2); padding:4px;}
@@ -205,6 +215,15 @@ img.bigface{width:110px; height:110px; object-fit:cover; border:3px solid var(--
 .tmark{fill:var(--amber);}
 .tmark.home{fill:var(--green);}
 .tmark.grave{fill:var(--red);}
+.tmark.city{fill:#ccb36a;}
+.tmark.gang{fill:#b6432e;}
+.tmark.town{fill:var(--amber);}
+.tmark.myth{fill:#8fb0c9;}
+.tmark.unknown{fill:var(--dim);}
+.tnode{cursor:pointer; stroke:var(--ink); stroke-width:1;}
+.tnode:active{stroke:var(--amber); stroke-width:2;}
+.tlabel[data-loc]{cursor:pointer;}
+.river{stroke:#4a5a6a; stroke-width:2.5; fill:none; opacity:.7;}
 .tlabel{fill:var(--ink); font-size:10px; font-family:inherit; text-anchor:middle; letter-spacing:1px;}
 .tsub{fill:var(--dim); font-size:8px; font-family:inherit; text-anchor:middle; font-style:italic;}
 

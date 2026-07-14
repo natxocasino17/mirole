@@ -11,6 +11,11 @@ import * as T from './time.js';
 
 const RISK_TXT = ['', 'bajo', 'serio', 'sangriento'];
 
+// La UI registra aquí su minijuego de cabalgata (fase 4). Si no hay UI
+// (tests headless), las misiones caen al camino no interactivo.
+let chaseRunner = null;
+export function setChaseRunner(fn) { chaseRunner = fn; }
+
 export function maybeRefreshJobs() {
   if (G.time.day - G.jobsDay >= 4 || !G.jobs.length) genJobs();
 }
@@ -185,7 +190,7 @@ const RUNNERS = {
       if (chance(ambushP)) {
         const foes = foesForRisk(job.risk);
         dogWarning(foes);
-        CB.startCombat({
+        const startAmbush = () => CB.startCombat({
           title: 'Emboscada en el camino', foes, canPay: true,
           intro: 'Salen de detrás de las rocas como si el desierto los pariera. Quieren la carga.',
           onEnd: (res) => {
@@ -195,6 +200,19 @@ const RUNNERS = {
             else { log('La carga se perdió en el camino. La Blackvein no paga derrotas.'); save(); }
           }
         });
+        // Fase 4: primero la persecución a caballo (interactiva). Si te
+        // desenvuelves bien, llegas a la emboscada con menos enemigos.
+        if (chaseRunner) {
+          scene({ title: '¡Nos persiguen!', text: 'Polvo a la espalda: jinetes. La carga es lenta, tú no. Espolea el caballo, esquiva las rocas y abate a los que puedas antes del choque.', opts: [{ t: '¡Arre!' }] }, () => {
+            chaseRunner(18, (r) => {
+              if (r.hits >= 4 && foes.length > 1) { foes.pop(); log(`Abatiste a ${r.hits} en la cabalgata: llegan menos a la emboscada.`); }
+              if (!r.survived) { for (const c of activeSquad()) addStress(c, 4); log('La cabalgata fue dura. Llegáis magullados.'); }
+              startAmbush();
+            });
+          });
+        } else {
+          startAmbush();
+        }
       } else {
         travel(1);
         payOut(job, 1);

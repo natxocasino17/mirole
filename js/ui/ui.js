@@ -46,6 +46,13 @@ export function init() {
     renderAll();
   });
   CB.setOnUpdate(renderAll);
+  // La UI presta su minijuego de cabalgata a las misiones (fase 4).
+  JB.setChaseRunner((seconds, cb) => {
+    $('screen').innerHTML = `<h2>🐎 LA CABALGATA</h2><div class="flavor">Toca los 🌵 y 🪨 para saltarlos y los 🤠 para abatirlos. Lo que llega a ti, te golpea. Tres golpes y caes.</div><div id="chaseBox"></div>`;
+    chase($('chaseBox'), seconds, (r) => {
+      showScene({ title: 'Fin de la cabalgata', text: `${r.hits} blancos alcanzados${r.survived ? '' : ', pero llegasteis molidos'}. ${r.hits >= 4 ? 'Cabalgas como Sam te enseñó.' : 'El polvo casi puede contigo.'}` }, () => cb(r));
+    });
+  });
   // El ticker se corta por diseño; tocarlo abre el registro entero.
   $('ticker').addEventListener('click', () => {
     if (!S.G || CB.C) return;
@@ -225,18 +232,25 @@ function cantina() {
   if (cantinaView === 'bj') { renderBJ(); return; }
   if (cantinaView === 'gallera') { renderGallera(); return; }
   if (cantinaView === 'range') { renderRange(); return; }
-  let html = `<h2>«EL CUERVO» — Marrow Creek</h2><div class="flavor">${mood}</div><div class="grid">`;
+  // El calendario semanal: no todo abre todos los días. El póker y el
+  // blackjack, siempre — la casa nunca cierra. Lo demás, va por días.
+  const DOW = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const dow = (g.time.day - 1) % 7;
+  const galleraOpen = dow === 3 || dow === 6;         // gallera: miércoles y sábado
+  const roseOpen = dow === 0 || dow === 2 || dow === 5; // el piso: domingo, martes, viernes
+  const rangeOpen = dow === 1 || dow === 4;            // práctica: lunes y jueves
+  let html = `<h2>«EL CUERVO» — Marrow Creek</h2><div class="flavor">${DOW[dow]}. ${mood}</div><div class="grid">`;
   html += `<button data-a="rest">🛏️ Descansar<br><span class="dim small">Dormir hasta mañana. Cura y calma.</span></button>`;
   html += `<button data-a="whisky" ${g.daily.whisky >= 3 || g.money < 3 ? 'disabled' : ''}>🥃 Whisky ($3)<br><span class="dim small">−12 estrés. ${3 - g.daily.whisky} restantes hoy.</span></button>`;
-  html += `<button data-a="poker" ${g.money < 5 ? 'disabled' : ''}>🃏 Póker<br><span class="dim small">Cinco cartas contra la casa.</span></button>`;
+  html += `<button data-a="poker" ${g.money < 5 ? 'disabled' : ''}>🃏 Póker<br><span class="dim small">Siempre abierto. Cinco cartas.</span></button>`;
+  html += `<button data-a="bj" ${g.money < 5 ? 'disabled' : ''}>🂡 Blackjack<br><span class="dim small">Siempre abierto. Veintiuno.</span></button>`;
+  const lily = g.relations.lily;
+  html += `<button data-a="rose" ${!roseOpen || g.daily.rose ? 'disabled' : ''}>🌹 ${lily && lily.courting ? 'Ver a Delia' : 'El piso de arriba'}<br><span class="dim small">${!roseOpen ? 'Abre dom · mar · vie.' : lily && lily.courting ? 'Te guarda la silla.' : 'Madame Vergne regenta.'}</span></button>`;
+  html += `<button data-a="gallo" ${!galleraOpen || g.daily.gallo || g.money < 5 ? 'disabled' : ''}>🐓 La gallera<br><span class="dim small">${!galleraOpen ? 'Solo miér · sáb.' : g.daily.gallo ? 'Ya apostaste hoy.' : 'Apuesta y mira volar plumas.'}</span></button>`;
+  html += `<button data-a="range" ${!rangeOpen || g.daily.range || g.ammo.balas < 1 ? 'disabled' : ''}>🎯 Práctica de tiro<br><span class="dim small">${!rangeOpen ? 'Solo lun · jue.' : g.ammo.balas < 1 ? 'Sin balas.' : 'Botellas en la cerca.'}</span></button>`;
   html += `<button data-a="clean" ${g.daily.clean ? 'disabled' : ''}>🔧 Limpiar armas<br><span class="dim small">+6 estado a todos los hierros.</span></button>`;
   html += `<button data-a="rumor" ${g.daily.rumor || g.money < 2 ? 'disabled' : ''}>👂 Rumores ($2)<br><span class="dim small">Invita a alguien. Escucha.</span></button>`;
   html += `<button data-a="otis" ${g.daily.otis ? 'disabled' : ''}>🍺 Charlar con Otis<br><span class="dim small">El tabernero lo sabe casi todo.</span></button>`;
-  const lily = g.relations.lily;
-  html += `<button data-a="rose" ${g.daily.rose ? 'disabled' : ''}>🌹 ${lily && lily.courting ? 'Ver a Delia' : 'El piso de arriba'}<br><span class="dim small">${lily && lily.courting ? 'Te guarda la silla de enfrente.' : 'Madame Vergne regenta. La casa no fía.'}</span></button>`;
-  html += `<button data-a="bj" ${g.money < 5 ? 'disabled' : ''}>🂡 Blackjack<br><span class="dim small">Veintiuno contra la casa.</span></button>`;
-  html += `<button data-a="gallo" ${g.daily.gallo || g.money < 5 ? 'disabled' : ''}>🐓 La gallera<br><span class="dim small">${g.daily.gallo ? 'Ya apostaste hoy.' : 'Apuesta y mira volar plumas.'}</span></button>`;
-  html += `<button data-a="range" ${g.daily.range || g.ammo.balas < 1 ? 'disabled' : ''}>🎯 Práctica de tiro<br><span class="dim small">${g.ammo.balas < 1 ? 'Sin balas.' : 'Botellas en la cerca. Gasta balas, gana ojo.'}</span></button>`;
   for (const c of squad) {
     const done = g.daily.talks.includes(c.id);
     html += `<button data-a="talk" data-id="${c.id}" ${done ? 'disabled' : ''}>💬 Hablar con ${c.alias || c.name}<br><span class="dim small">${done ? 'Ya hablasteis hoy.' : 'Lealtad ' + c.loyalty}</span></button>`;
@@ -817,6 +831,9 @@ function charDetail(id) {
 function diario() {
   const g = S.G;
   let html = `<h2>📜 EL DIARIO</h2>`;
+  // 🧵 EL HILO: dónde estás en la historia y qué viene ahora. Para que
+  // nunca pierdas el sentido, por muchos días de relleno que pasen.
+  html += `<h3>🧵 El Hilo — dónde estás</h3><div class="panel">${storyThread()}</div>`;
   html += `<h3>⚰️ El cementerio</h3>`;
   if (!g.cemetery.length) html += `<div class="panel small dim">Aún no has enterrado a nadie. Disfrútalo mientras dure.</div>`;
   for (const t of [...g.cemetery].reverse()) {
@@ -964,7 +981,9 @@ function renderGallera() {
   }
   // pelea en curso / terminada
   const done = gfS.shown >= gfS.sim.rounds.length;
-  html += `<div class="gallera-arena"><span id="gA" class="gallo">🐓</span><span id="gB" class="gallo flip">🐓</span></div>
+  html += `<div class="gallera-arena">
+      <div class="gallo-wrap"><span id="gA" class="gallo faceR">🐓</span><b class="dim small">${f.a.name}</b></div>
+      <div class="gallo-wrap"><span id="gB" class="gallo faceL">🐓</span><b class="dim small">${f.b.name}</b></div></div>
     <div class="clog" id="gLog">${gfS.sim.rounds.slice(0, gfS.shown).map(r => `<div>${r.txt}${r.dmg ? ` <span class="red">(−${r.dmg})</span>` : ''}</div>`).join('')}</div>`;
   if (done) {
     const won = gfS.bet.side === 'a' ? gfS.sim.winner === f.a.name : gfS.sim.winner === f.b.name;
@@ -1064,35 +1083,55 @@ function renderEmpire() {
 
 // ==================== EL MAPA DEL TERRITORIO ====================
 function renderTerritory() {
-  const f = S.G.flags;
-  const known = {
-    dryWells: S.G.once.includes('sq_dry_wells'),
-    arroyo: f.t1done >= 8,
-    bentFork: S.G.once.includes('sq_cartas') || f.t1done >= 8
-  };
-  const mark = (x, y, label, sub, cls) => `
-    <circle cx="${x}" cy="${y}" r="4" class="tmark ${cls || ''}"/>
-    <text x="${x}" y="${y - 8}" class="tlabel">${label}</text>
-    ${sub ? `<text x="${x}" y="${y + 15}" class="tsub">${sub}</text>` : ''}`;
+  const f = S.G.flags, once = S.G.once;
+  // Cada lugar: coords, nombre, subtítulo, tipo, ¿descubierto?, e historia.
+  const LOCS = [
+    { id: 'marrow', x: 175, y: 175, r: 6, cls: 'home', name: 'MARROW CREEK', sub: 'tu casa',
+      known: true, desc: 'Barro, tablones y «El Cuervo». Aquí tienes mesa, gente y una silla que aún no está caliente. Todo lo demás en este mapa gira alrededor de este punto.' },
+    { id: 'blackvein', x: 322, y: 78, r: 6, cls: 'city', name: 'BLACKVEIN CITY', sub: 'humo y libretas',
+      known: true, desc: 'La ciudad del carbón: doce mil almas, luz eléctrica en tres calles, y la Compañía Blackvein contándolo todo desde una oficina con demasiados papeles. El futuro vive aquí. No parece contento de vivir.' },
+    { id: 'desfiladero', x: 60, y: 118, r: 4, cls: 'grave', name: 'El Desfiladero', sub: 'donde empezó todo',
+      known: true, desc: 'Rocas rojas y un camino que se estrecha. Aquí murió Sam Corddry, traicionado por Dawson. Vuelves a veces, en sueños. Él te dice que dejes de venir.' },
+    { id: 'dry_creek', x: 300, y: 215, r: 5, cls: 'gang', name: 'Dry Creek', sub: 'las tierras malas',
+      known: f.t1done >= 4, desc: 'El feudo de los Kettle, forajidos a la antigua. Boone Kettle heredó el rencor de Ezekiel Grey. Aquí no se entra sin motivo, y del motivo casi nunca se vuelve.' },
+    { id: 'redwater', x: 120, y: 250, r: 5, cls: 'gang', name: 'Redwater', sub: 'el río del sur',
+      known: f.t1done >= 8 || once.includes('sq_viuda'), desc: 'Contrabando, barcazas y la Reina Sable, que heredó el oficio de Rose Thatcher. En el río se compra todo — hasta la paz, si sabes con quién hablar.' },
+    { id: 'bent_fork', x: 152, y: 58, r: 5, cls: 'town', name: 'Bent Fork', sub: 'campos e iglesia',
+      known: once.includes('sq_cartas') || f.t1done >= 8, desc: 'Trigo, una iglesia quemada y el silencio del norte. Bajo el altar de esa iglesia hay una historia que Sam se llevó a la tumba. La Marshal Rourke pone aquí su placa.' },
+    { id: 'dry_wells', x: 58, y: 235, r: 4, cls: 'grave', name: 'Dry Wells', sub: 'el pueblo del silencio',
+      known: once.includes('sq_dry_wells'), desc: 'Un pueblo entero que se levantó de la mesa y no volvió. La Blackvein envenenó su pozo para comprarlo por centavos. No queda nadie. Casi nadie.' },
+    { id: 'arroyo', x: 285, y: 150, r: 4, cls: 'grave', name: 'El Arroyo Seco', sub: 'dos tumbas',
+      known: f.t1done >= 8, desc: 'Una cicatriz de grava blanca. Aquí, en 1874, murió una amistad. Y aquí, un cuarto de siglo después, la enterraste del todo. Dos socios, dos tumbas, una historia cerrada.' },
+    { id: 'niebla', x: 40, y: 175, r: 3, cls: 'myth', name: '¿?', sub: '',
+      known: once.includes('taberna_niebla'), desc: 'Una luz donde nunca hubo nada. Una taberna que solo aparece con la niebla cerrada y sirve un whisky que sabe a tu mejor recuerdo. Nadie la encuentra dos veces. Tú sí la encontraste una.' }
+  ];
+  const node = (l) => l.known ? `
+    <circle cx="${l.x}" cy="${l.y}" r="${l.r}" class="tmark ${l.cls} tnode" data-loc="${l.id}"/>
+    <text x="${l.x}" y="${l.y - l.r - 3}" class="tlabel" data-loc="${l.id}">${l.name}</text>
+    ${l.sub ? `<text x="${l.x}" y="${l.y + l.r + 10}" class="tsub">${l.sub}</text>` : ''}`
+    : `<circle cx="${l.x}" cy="${l.y}" r="3" class="tmark unknown"/><text x="${l.x}" y="${l.y - 6}" class="tlabel dim">?</text>`;
   $('screen').innerHTML = `<button data-back="1">← Volver al pueblo</button>
     <h2 style="margin-top:10px">🗺️ TERRITORIO DE RED MARROW</h2>
-    <div class="flavor">Dibujado de memoria y de rumores. Las distancias miente el que las dibujó.</div>
+    <div class="flavor">Toca un lugar para recordar su historia. Los sitios aparecen cuando los vives.</div>
     <div class="tmap"><svg viewBox="0 0 360 300" xmlns="http://www.w3.org/2000/svg">
-      <path d="M20 60 Q80 90 60 130 Q40 170 70 230 Q90 260 140 250" class="trail dim2"/>
-      <path d="M170 170 L150 62 M170 170 Q240 160 280 200 M170 170 Q250 120 318 82 M170 170 Q120 150 62 122 M170 170 Q110 200 62 232" class="trail"/>
-      <path d="M30 100 l8 -10 l8 10 M50 95 l8 -10 l8 10 M195 30 l8 -10 l8 10 M215 35 l8 -10 l8 10 M235 28 l8 -10 l8 10" class="tmount"/>
-      <text x="222" y="18" class="tsub">colinas del norte</text>
-      <text x="285" y="255" class="tsub">tierras malas</text>
-      <text x="30" y="285" class="tsub">el desierto grande</text>
-      ${mark(170, 170, 'MARROW CREEK', 'tu mesa, tu gente', 'home')}
-      ${mark(318, 82, 'BLACKVEIN CITY', 'humo y libretas')}
-      ${mark(62, 122, 'El Desfiladero', 'donde empezó todo', 'grave')}
-      ${mark(150, 62, known.bentFork ? 'Bent Fork' : '¿?', known.bentFork ? 'la iglesia quemada' : '')}
-      ${known.dryWells ? mark(62, 232, 'Dry Wells', 'el pueblo del silencio', 'grave') : ''}
-      ${known.arroyo ? mark(280, 200, 'El Arroyo Seco', 'dos tumbas con historia', 'grave') : ''}
+      <rect x="0" y="0" width="360" height="300" fill="#1b1712"/>
+      <path d="M0 40 Q90 20 180 45 T360 40 L360 0 L0 0 Z" fill="#221c14" opacity="0.6"/>
+      <path d="M0 260 Q120 285 240 265 T360 270 L360 300 L0 300 Z" fill="#241d12" opacity="0.6"/>
+      <path d="M175 175 L322 78 M175 175 L300 215 M175 175 L120 250 M175 175 L152 58 M175 175 L60 118 M175 175 L58 235 M175 175 L285 150" class="trail"/>
+      <path d="M90 250 Q140 240 180 255 Q230 272 300 250" class="river"/>
+      <path d="M40 100 l7 -11 l7 11 M56 96 l7 -11 l7 11 M130 44 l7 -11 l7 11 M146 40 l7 -11 l7 11 M162 44 l7 -11 l7 11" class="tmount"/>
+      <text x="150" y="20" class="tsub">colinas del norte</text>
+      <text x="300" y="245" class="tsub">tierras malas</text>
+      <text x="45" y="290" class="tsub">el desierto grande</text>
+      <text x="240" y="285" class="tsub">～ el río rojo ～</text>
+      ${LOCS.map(node).join('')}
     </svg></div>
-    <div class="panel small dim">Los lugares aparecen cuando los vives. El territorio se gana a pie.</div>`;
+    <div class="panel small dim">☠ tumbas · ● pueblos · ◆ ciudad · ✦ leyendas. El territorio se gana a pie.</div>`;
   $('screen').querySelector('[data-back]').onclick = () => { mapaView = null; renderAll(); };
+  $('screen').querySelectorAll('[data-loc]').forEach(el => el.addEventListener('click', () => {
+    const l = LOCS.find(x => x.id === el.getAttribute('data-loc'));
+    if (l && l.known) showScene({ title: `📍 ${l.name}`, text: l.desc }, () => {});
+  }));
 }
 
 // ==================== COMBATE ====================
@@ -1206,6 +1245,31 @@ function renderCombat() {
 }
 
 function cap0(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
+
+// El Hilo: resume la historia principal y señala el siguiente paso.
+// Así el modo historia solo «avanza» cuando TÚ juegas la misión principal.
+function storyThread() {
+  const g = S.G, f = g.flags;
+  const TITLES = { 1: 'El camino de Marrow Creek', 2: 'El hombre del bombín', 3: 'La pista de Dawson',
+    4: 'Plumas rojas', 5: 'La noche que sangró «El Cuervo»', 6: 'El nombre del muerto',
+    7: 'Los aliados del alba', 8: 'El arroyo seco' };
+  const done = f.t1done || 1;
+  // ¿Tomo II activo?
+  if (done >= 8) {
+    if (!g.territory || !g.territory.init) return '<b class="amber">TOMO II — «El precio de una corona»</b><br>La guerra de facciones está por comenzar. Ve al MAPA → EL TERRITORIO.';
+    const n = EMP.playerTownCount();
+    if (g.territory.crowned) return '<b class="amber">TOMO II — completado</b><br>Reinas sobre Red Marrow. El Tomo III (el traspaso) llegará con una futura actualización. Mientras: el territorio es tuyo. Vívelo.';
+    const p = EMP.path();
+    return `<b class="amber">TOMO II — «El precio de una corona»</b><br>Controlas <b>${n}/5</b> pueblos. Camino: ${p === 'querido' ? 'el patrón <span class="green">querido</span>' : p === 'temido' ? 'el amo <span class="red">temido</span>' : 'mixto'}.<br><span class="dim">Siguiente: gana influencia en el MAPA → EL TERRITORIO. Controla los cinco pueblos para reclamar la corona.</span>`;
+  }
+  // Tomo I en curso
+  let next;
+  if (f.t1) next = `Te espera el <b>Capítulo ${f.t1}: ${TITLES[f.t1]}</b> en el MAPA (marcado 📖).`;
+  else if (done === 2 && f.dawson === 2) next = 'Sigue <b>la pista de Dawson</b> en el MAPA (★), cuando estés listo.';
+  else if (done === 2) next = 'Un rumor sobre Dawson llegará pronto. Vive tu vida mientras tanto.';
+  else next = `El siguiente capítulo llegará con los días. La historia solo avanza cuando tú das el paso.`;
+  return `<b class="amber">TOMO I — «Todos los caminos cobran peaje»</b><br>Último capítulo cerrado: <b>${done}. ${TITLES[done] || '—'}</b>.<br><span class="dim">${next}</span>`;
+}
 
 function showIntim() {
   showScene({

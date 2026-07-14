@@ -120,3 +120,76 @@ export function quickdraw(container, myReflex, foeReflex, foeName, done) {
     setTimeout(() => done(win), 1300);
   }
 }
+
+// ---------- LA CABALGATA: persecución interactiva (fase 4) ----------
+// Cosas vuelan hacia ti desde el frente del camino: obstáculos que hay
+// que ESQUIVAR (tócalos para saltarlos) y jinetes enemigos que hay que
+// ABATIR (tócalos para disparar). Lo que no tocas a tiempo, te golpea.
+// done({score, hits, misses}). Puro DOM: vivirá en 2060 igual que hoy.
+export function chase(container, seconds, done) {
+  let hits = 0, misses = 0, over = false, hp = 3;
+  container.innerHTML = `
+    <div class="range-arena chase" id="cArena">
+      <div class="range-hud">${seconds}s · ⏱ <span id="cTime">${seconds}</span> · ❤ <span id="cHp">3</span> · 🎯 <span id="cHits">0</span></div>
+      <div class="rider">🐎</div>
+    </div>`;
+  const arena = container.querySelector('#cArena');
+
+  function spawn() {
+    if (over) return;
+    const enemy = Math.random() < 0.5;
+    const el = document.createElement('div');
+    el.className = 'flyer ' + (enemy ? 'foe' : 'obs');
+    el.dataset.kind = enemy ? 'foe' : 'obs';
+    el.textContent = enemy ? '🤠' : (Math.random() < 0.5 ? '🌵' : '🪨');
+    el.style.top = (20 + Math.random() * 55) + '%';
+    el.style.left = '100%';
+    arena.appendChild(el);
+    const dur = 1500 + Math.random() * 900;
+    el.style.transition = `left ${dur}ms linear`;
+    requestAnimationFrame(() => { el.style.left = '-16%'; });
+    // Si llega al jinete sin tocarlo, golpea.
+    const timer = setTimeout(() => {
+      if (el.dataset.done) return;
+      el.dataset.done = '1';
+      hp--; misses++;
+      container.querySelector('#cHp').textContent = Math.max(0, hp);
+      arena.classList.add('shake');
+      setTimeout(() => arena.classList.remove('shake'), 200);
+      el.remove();
+      if (hp <= 0) end();
+    }, dur * 0.82);
+    el._timer = timer;
+    setTimeout(spawn, 620 + Math.random() * 520);
+  }
+
+  arena.addEventListener('pointerdown', e => {
+    if (over) return;
+    const t = e.target;
+    if (t.classList && t.classList.contains('flyer') && !t.dataset.done) {
+      t.dataset.done = '1';
+      clearTimeout(t._timer);
+      hits++;
+      container.querySelector('#cHits').textContent = hits;
+      t.textContent = t.dataset.kind === 'foe' ? '💥' : '✨';
+      t.classList.add('hitfx');
+      setTimeout(() => t.remove(), 200);
+    }
+  });
+
+  let left = seconds;
+  const clock = setInterval(() => {
+    left--;
+    const el = container.querySelector('#cTime');
+    if (el) el.textContent = left;
+    if (left <= 0) end();
+  }, 1000);
+
+  function end() {
+    if (over) return;
+    over = true;
+    clearInterval(clock);
+    setTimeout(() => done({ score: hits, hits, misses, survived: hp > 0 }), 350);
+  }
+  spawn();
+}
