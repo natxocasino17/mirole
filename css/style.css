@@ -208,6 +208,15 @@ img.bigface{width:110px; height:110px; object-fit:cover; border:3px solid var(--
 .tlabel{fill:var(--ink); font-size:10px; font-family:inherit; text-anchor:middle; letter-spacing:1px;}
 .tsub{fill:var(--dim); font-size:8px; font-family:inherit; text-anchor:middle; font-style:italic;}
 
+/* guerra de facciones */
+.infbars{margin-top:6px;}
+.infrow{display:flex; align-items:center; gap:6px; font-size:11px; margin:2px 0;}
+.infname{width:120px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.infbar{flex:1; height:8px; background:#0c0b08; border:1px solid var(--line);}
+.infbar i{display:block; height:100%;}
+.infrow em{font-style:normal; width:22px; text-align:right; color:var(--dim);}
+button.special{border-color:var(--amber2);}
+
 /* tumbas */
 .grave{border-left:3px solid var(--line); padding:6px 10px; margin-bottom:8px;}
 .grave .gname{color:var(--amber);}

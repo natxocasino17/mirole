@@ -8,6 +8,7 @@ import { aliveSquad, player } from './chars.js';
 import { DAILY_POOL, MYTHIC_POOL, EVENTS } from '../data/events.js';
 import { pickSideQuest } from '../data/sidequests.js';
 import { tomo1Check } from '../data/tomo1.js';
+import { ensureTerritory, empireUnlocked, drift } from './empire.js';
 
 export function dailyTick() {
   const p = player();
@@ -15,6 +16,13 @@ export function dailyTick() {
 
   // La novela avanza: ¿toca capítulo nuevo?
   tomo1Check();
+
+  // El Tomo II: al cerrar el Tomo I, se abre la guerra de facciones.
+  if (empireUnlocked()) {
+    ensureTerritory();
+    drift();
+    if (!G.flags.t2intro) { G.flags.t2intro = true; queueEvent('t2_intro'); }
+  }
 
   // 🎪 Cada dos semanas, el pueblo respira: día de feria.
   if (G.time.day % 14 === 0) queueEvent('feria');

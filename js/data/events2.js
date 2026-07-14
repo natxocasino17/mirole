@@ -5,6 +5,7 @@ import { G, log, journal, yearOf, dateStr } from '../engine/state.js';
 import { rint, pick, chance } from '../engine/rng.js';
 import { player, aliveSquad, addStress } from '../engine/chars.js';
 import { mkFoe } from './enemies.js';
+import { GANGS } from './gangs.js';
 import * as CB from '../engine/combat.js';
 
 const bondKey = (a, b) => `${Math.min(a, b)}-${Math.max(a, b)}`;
@@ -189,6 +190,41 @@ export const EVENTS2 = {
         title: '🔥 La fogata',
         text: `${pick(vignettes)}${extra}\n\nTú miras desde tu manta y no intervienes. Una banda no se manda a todas horas: a veces solo se cuida desde lejos.`,
         opts: [{ t: 'Dejar que la noche haga su trabajo' }]
+      };
+    }
+  },
+
+  // ---------- TOMO II: la apertura de la guerra de facciones ----------
+  t2_intro: {
+    build() {
+      return {
+        title: '📖 TOMO II — «El precio de una corona»',
+        text: 'Con Grey bajo tierra, algo ha cambiado en el aire del territorio.\n\nDurante veinticinco años, el miedo a Grey mantuvo un equilibrio: cada banda en su rincón, cada pueblo en su sitio. Tú rompiste ese equilibrio de un disparo. Ahora Red Marrow es una silla vacía, y todos los buitres lo huelen.\n\nCinco poderes se disputan el territorio: los Ashgrove de tu propio pueblo, los Kettle de las tierras malas, la Reina Sable y su río, la Compañía Blackvein con su humo y su dinero, y la Ley nueva que no se compra.\n\nEli lo dice mirando el fuego: «Un hombre que mata a un rey se queda con dos opciones, muchacho: huir muy lejos... o sentarse en la silla. Y tú nunca fuiste de huir.»\n\nEn el MAPA hay ahora un tablero nuevo: EL TERRITORIO. Cinco pueblos que se ganan despacio — con tratos y favores, o con sangre y miedo. Los dos caminos llevan a la corona. Solo cambia quién te defiende cuando ya la llevas puesta.',
+        opts: [{ t: 'Mirar el tablero', fx() {
+          journal('Empieza el Tomo II. Cinco pueblos, cinco bandas, una silla vacía. Voy a por ella. La pregunta que Eli no hace en voz alta: ¿a por ella cómo?');
+        } }]
+      };
+    }
+  },
+
+  faccion_guerra: {
+    build(arg) {
+      const g = GANGS[arg];
+      if (!g) return null;
+      return {
+        title: `⚔ ${g.name} responde`,
+        text: `No les ha gustado tu método. ${g.leader} manda un mensaje de vuelta — con jinetes, no con palabras. Te esperan a las afueras.\n\n«${g.tag}.» El que manda escupe en el polvo. «Aquí no todo se toma a golpes, forastero. Algunos todavía sabemos defender lo nuestro.»`,
+        opts: [{ t: 'Recibirlos', fx() {
+          const foes = [mkFoe('veterano', `Hombre de ${g.leader.split(' ')[0]}`), mkFoe('pistolero'), mkFoe('maton')];
+          CB.startCombat({
+            title: `Represalia de ${g.name}`, foes,
+            intro: 'El miedo que siembras también cosecha balas. Así funciona el terreno regado con sangre.',
+            onEnd: (res) => {
+              if (res === 'win') journal(`${g.name} me midió y perdió. Por ahora el miedo aguanta. Pero el miedo siempre presenta otra factura.`);
+              else journal(`${g.name} me dio una lección. El poder tomado a la fuerza se defiende a la fuerza, cada semana, para siempre. Grey lo sabía. Yo lo aprendo.`);
+            }
+          });
+        } }]
       };
     }
   },

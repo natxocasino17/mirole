@@ -13,6 +13,8 @@ import { TOMO1 } from '../data/tomo1.js';
 import { otisLine, fitchLine, quillLine, curlyLine, upstairsScene } from '../data/npcs.js';
 import { bjDeal, bjHit, bjStand, bjValue, bjResult, genFight, simFight } from '../engine/casino.js';
 import { practice, quickdraw } from '../engine/range.js';
+import * as EMP from '../engine/empire.js';
+import { TOWNS, GANGS, TOWN_ORDER } from '../data/gangs.js';
 import { WEAPONS, GOODS, ROPA, UPGRADES, HORSES, SHOP_ALMACEN, SHOP_ARMERO, SHOP_SASTRE,
          mkWeapon, mkGood, mkRopa, itemName, itemDef, effAcc, effMag, effJam, effDurMax } from '../data/items.js';
 import { HERO_NAMES } from '../data/names.js';
@@ -444,6 +446,12 @@ function mapa() {
   // El territorio, dibujado
   html += `<div class="grid"><button class="wide" data-shop="terr">🗺️ Ver el mapa del territorio<br><span class="dim small">Lo conocido, lo rumoreado y lo que mejor no visitar.</span></button></div>`;
 
+  // TOMO II: la guerra de facciones, si ya cerraste el Tomo I
+  if (EMP.empireUnlocked() && g.territory && g.territory.init) {
+    const n = EMP.playerTownCount();
+    html += `<div class="grid"><button class="wide special" data-shop="empire">👑 EL TERRITORIO — guerra de facciones<br><span class="dim small">Pueblos bajo tu control: ${n}/${TOWN_ORDER.length}. La corona se gana despacio.</span></button></div>`;
+  }
+
   // Los comercios
   html += `<h3>🏘️ El pueblo</h3><div class="grid">
     <button data-shop="almacen">🏪 Almacén<br><span class="dim small">Munición, vendas, whisky.</span></button>
@@ -498,6 +506,7 @@ function renderShop(view) {
   let html = '';
 
   if (view === 'terr') { renderTerritory(); return; }
+  if (view === 'empire') { renderEmpire(); return; }
 
   if (view === 'almacen') {
     html = shopHeader('🏪 ALMACÉN', 'Huele a grano, cuerda y pólvora. Como debe ser.');
@@ -1006,6 +1015,50 @@ function renderRange() {
     cantinaView = null;
     renderAll();
     showScene({ title: '🎯 Resultado', text: `${hits} botellas de ${shots} disparos.\n\n${hits > 5 ? 'El pueblo entero oyó el ritmo. Eso también es fama.' : hits > 2 ? 'Mano firme. La leyenda se fabrica bala a bala.' : 'Las botellas ganaron hoy. Mañana es otro duelo.'}\n\n(+${hits} XP de puntería)` }, () => {});
+  });
+}
+
+// ==================== LA GUERRA DE FACCIONES (TOMO II) ====================
+function renderEmpire() {
+  const g = S.G;
+  EMP.ensureTerritory();
+  const path = EMP.path();
+  const pathTxt = path === 'querido' ? '<span class="green">Camino del patrón querido</span> — tu control se sostiene solo.'
+    : path === 'temido' ? '<span class="red">Camino del amo temido</span> — el miedo se erosiona sin sangre fresca.'
+    : 'Camino mixto — ni del todo querido, ni del todo temido.';
+  let html = `<button data-back="1">← Volver al pueblo</button>
+    <h2 style="margin-top:10px">👑 EL TERRITORIO</h2>
+    <div class="flavor">${pathTxt}<br>Humanidad ${g.rep.humanidad} · Pueblos tuyos: ${EMP.playerTownCount()}/${TOWN_ORDER.length}</div>`;
+
+  for (const tid of TOWN_ORDER) {
+    const town = TOWNS[tid];
+    const inf = g.territory.towns[tid].inf;
+    const ctrl = EMP.controllerOf(tid);
+    const ctrlName = ctrl === 'player' ? 'TÚ' : ctrl ? GANGS[ctrl].name : 'nadie manda aún';
+    const ctrlCls = ctrl === 'player' ? 'green' : ctrl ? 'red' : 'dim';
+    // barras de influencia
+    const parts = Object.keys(inf).filter(k => inf[k] > 0).sort((a, b) => inf[b] - inf[a]);
+    let bars = '';
+    for (const k of parts) {
+      const nm = k === 'player' ? 'Tú' : GANGS[k].name;
+      const col = k === 'player' ? 'var(--green)' : (GANGS[k] ? GANGS[k].color : 'var(--dim)');
+      bars += `<div class="infrow"><span class="infname">${nm}</span><div class="infbar"><i style="width:${inf[k]}%;background:${col}"></i></div><em>${inf[k]}</em></div>`;
+    }
+    html += `<div class="card"><div class="row"><span class="title">${town.name}</span><span class="${ctrlCls} small">${ctrlName}</span></div>
+      <div class="small dim">${town.sub}</div>
+      <div class="infbars">${bars}</div>
+      <div class="grid" style="margin-top:8px">
+        <button data-emp="parley:${tid}">🤝 Parlamentar<br><span class="dim small">Labia. Lento, limpio.</span></button>
+        <button data-emp="favor:${tid}">🎁 Hacer un favor<br><span class="dim small">Dinero. +humanidad.</span></button>
+        <button data-emp="blood:${tid}" class="danger">🩸 Apretar<br><span class="dim small">Miedo. Rápido, −humanidad.</span></button>
+      </div></div>`;
+  }
+  html += `<div class="panel small dim">Cada maniobra consume días: esta guerra se libra en años, no en tardes. Controla los cinco pueblos para reclamar la corona — y elige con qué mano la reclamas.</div>`;
+  $('screen').innerHTML = html;
+  $('screen').querySelector('[data-back]').onclick = () => { mapaView = null; renderAll(); };
+  $('screen').querySelectorAll('button[data-emp]').forEach(b => b.onclick = () => {
+    const [kind, tid] = b.dataset.emp.split(':');
+    EMP.maneuver(tid, kind, showScene);
   });
 }
 
