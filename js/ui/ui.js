@@ -14,6 +14,7 @@ import { otisLine, fitchLine, quillLine, curlyLine, upstairsScene } from '../dat
 import { bjDeal, bjHit, bjStand, bjValue, bjResult, genFight, simFight } from '../engine/casino.js';
 import { practice, quickdraw } from '../engine/range.js';
 import * as EMP from '../engine/empire.js';
+import * as HEARTS from '../engine/hearts.js';
 import { TOWNS, GANGS, TOWN_ORDER } from '../data/gangs.js';
 import { WEAPONS, GOODS, ROPA, UPGRADES, HORSES, SHOP_ALMACEN, SHOP_ARMERO, SHOP_SASTRE,
          mkWeapon, mkGood, mkRopa, itemName, itemDef, effAcc, effMag, effJam, effDurMax } from '../data/items.js';
@@ -138,7 +139,7 @@ export function renderAll() {
 
 function resetDaily() {
   if (S.G.daily.day !== S.G.time.day) {
-    S.G.daily = { day: S.G.time.day, whisky: 0, talks: [], clean: false, rumor: false, pet: false, otis: false, rose: false, gallo: false, range: false };
+    S.G.daily = { day: S.G.time.day, whisky: 0, talks: [], clean: false, rumor: false, pet: false, otis: false, rose: false, gallo: false, range: false, news: false };
   }
 }
 
@@ -251,6 +252,7 @@ function cantina() {
   html += `<button data-a="clean" ${g.daily.clean ? 'disabled' : ''}>🔧 Limpiar armas<br><span class="dim small">+6 estado a todos los hierros.</span></button>`;
   html += `<button data-a="rumor" ${g.daily.rumor || g.money < 2 ? 'disabled' : ''}>👂 Rumores ($2)<br><span class="dim small">Invita a alguien. Escucha.</span></button>`;
   html += `<button data-a="otis" ${g.daily.otis ? 'disabled' : ''}>🍺 Charlar con Otis<br><span class="dim small">El tabernero lo sabe casi todo.</span></button>`;
+  html += `<button data-a="news" ${g.daily.news ? 'disabled' : ''}>📰 Leer el Courier<br><span class="dim small">${g.daily.news ? 'Ya lo leíste hoy.' : 'El periódico del territorio. Cada día.'}</span></button>`;
   for (const c of squad) {
     const done = g.daily.talks.includes(c.id);
     html += `<button data-a="talk" data-id="${c.id}" ${done ? 'disabled' : ''}>💬 Hablar con ${c.alias || c.name}<br><span class="dim small">${done ? 'Ya hablasteis hoy.' : 'Lealtad ' + c.loyalty}</span></button>`;
@@ -301,6 +303,10 @@ function cantinaAct(d) {
   if (d.a === 'otis') {
     g.daily.otis = true;
     showScene({ title: 'Otis, «El Cuervo»', text: otisLine() }, () => {});
+  }
+  if (d.a === 'news') {
+    g.daily.news = true;
+    showScene(EVENTS.periodico.build(), () => {});
   }
   if (d.a === 'rose') {
     g.daily.rose = true;
@@ -700,11 +706,27 @@ function banda() {
       <span class="dim">${isP ? 'Estrés ' + c.stress : 'Lealtad ' + c.loyalty}</span></div>
     </div>`;
   }
+  // ❤ Vínculos abiertos: la gente que conoces, cortejas o quieres.
+  HEARTS.ensureHearts();
+  const cands = HEARTS.candidates();
+  const pt = HEARTS.partner();
+  html += `<h3>❤ Vínculos</h3>`;
+  if (pt) html += `<div class="card special"><div class="title">${pt.name} · pareja</div><div class="small dim">${pt.tag}</div><div class="row"><span class="dim">Vuestra vida cabe en las noches que el territorio os deja.</span><button data-heart="${pt.key}">Ver</button></div></div>`;
+  const otros = cands.filter(p => !pt || p.key !== pt.key);
+  if (!otros.length && !pt) html += `<div class="panel small dim">No conoces a nadie... todavía. La gente aparece sola, en la cantina, la feria, los caminos. El territorio es ancho y está lleno de vidas.</div>`;
+  for (const p of otros) {
+    html += `<div class="card"><div class="title">${p.name}</div><div class="small dim">${p.tag} · ${p.where}</div>
+      <div class="row"><span class="dim">${p.stage === 'ended' ? 'ya no os veis' : 'Afinidad ' + ('♥'.repeat(Math.ceil(p.af / 3)) || '·')}</span>
+      ${p.stage !== 'ended' ? `<button data-heart="${p.key}">Cortejar</button>` : ''}</div></div>`;
+  }
   html += `<h3>📦 Alforjas comunes</h3><div class="panel small">${
     g.stash.length ? g.stash.map(it => itemName(it) + (it.kind === 'weapon' ? ` (${it.broken ? 'ROTA' : it.dur + '%'})` : '')).join(' · ') : 'Vacías. Como las promesas de la Blackvein.'
   }</div>`;
   $('screen').innerHTML = html;
   $('screen').querySelectorAll('[data-ch]').forEach(el => el.onclick = () => { detailChar = +el.dataset.ch; renderAll(); });
+  $('screen').querySelectorAll('button[data-heart]').forEach(b => b.onclick = () => {
+    showScene(HEARTS.courtScene(b.dataset.heart), () => {});
+  });
 }
 
 function charDetail(id) {
@@ -1262,6 +1284,8 @@ function storyThread() {
     const p = EMP.path();
     return `<b class="amber">TOMO II — «El precio de una corona»</b><br>Controlas <b>${n}/5</b> pueblos. Camino: ${p === 'querido' ? 'el patrón <span class="green">querido</span>' : p === 'temido' ? 'el amo <span class="red">temido</span>' : 'mixto'}.<br><span class="dim">Siguiente: gana influencia en el MAPA → EL TERRITORIO. Controla los cinco pueblos para reclamar la corona.</span>`;
   }
+  // La pareja, si la hay, aparece en el hilo (vínculo abierto).
+  // (se antepone al resumen del tomo abajo)
   // Tomo I en curso
   let next;
   if (f.t1) next = `Te espera el <b>Capítulo ${f.t1}: ${TITLES[f.t1]}</b> en el MAPA (marcado 📖).`;

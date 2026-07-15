@@ -9,6 +9,7 @@ import { DAILY_POOL, MYTHIC_POOL, EVENTS } from '../data/events.js';
 import { pickSideQuest } from '../data/sidequests.js';
 import { tomo1Check } from '../data/tomo1.js';
 import { ensureTerritory, empireUnlocked, drift } from './empire.js';
+import { ensureHearts, shouldIntroduce, heartsTick } from './hearts.js';
 
 export function dailyTick() {
   const p = player();
@@ -28,7 +29,7 @@ export function dailyTick() {
   if (G.time.day % 14 === 0) queueEvent('feria');
 
   // 📰 El Courier sale cada mes: tu leyenda, mal escrita por otros.
-  if (G.time.day % 30 === 6) queueEvent('periodico');
+  if (G.time.day % 7 === 6) queueEvent('periodico');
 
   // 📅 Aniversarios: el tiempo es circular para los que recuerdan.
   const doy = (G.time.day - 1) % 360 + 1;
@@ -48,6 +49,11 @@ export function dailyTick() {
 
   // 🔥 La fogata: la banda se pertenece también sin ti.
   if (aliveSquad().filter(c => c.id !== G.player).length >= 2 && chance(0.08)) queueEvent('fogata');
+
+  // ❤ Vínculos abiertos: la gente aparece orgánicamente. Nadie escrito.
+  ensureHearts();
+  heartsTick();
+  if (G.time.day > 10 && shouldIntroduce()) queueEvent('conoces_alguien');
 
   // ☠️ Las némesis vencen su plazo y vienen a cobrarlo.
   for (const nm of G.nemeses || []) {

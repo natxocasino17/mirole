@@ -6,6 +6,8 @@ import { rint, pick, chance } from '../engine/rng.js';
 import { player, aliveSquad, addStress } from '../engine/chars.js';
 import { mkFoe } from './enemies.js';
 import { GANGS } from './gangs.js';
+import { introduce, breakup } from '../engine/hearts.js';
+import { firstName } from './people.js';
 import * as CB from '../engine/combat.js';
 
 const bondKey = (a, b) => `${Math.min(a, b)}-${Math.max(a, b)}`;
@@ -225,6 +227,38 @@ export const EVENTS2 = {
             }
           });
         } }]
+      };
+    }
+  },
+
+  // ---------- ❤ vínculos abiertos: conocer gente orgánicamente ----------
+  conoces_alguien: {
+    build() {
+      const p = introduce();
+      if (!p) return null;
+      return {
+        title: '❤ Alguien nuevo',
+        text: `En ${p.where} te cruzas con ${p.name}. ${cap(p.tag)}. No es un flechazo de novela barata — es solo una cara que, por algún motivo, se te queda.\n\nHablan un rato. ${cap(firstName(p))} ${p.pron === 'ella' ? 'tiene' : 'tiene'} una forma de mirar el mundo que te hace querer volver a ${p.where}.\n\n(En BANDA → Vínculos puedes cortejar a quien conozcas. O no. El territorio es ancho.)`,
+        opts: [{ t: 'Guardarse el nombre' }]
+      };
+    }
+  },
+
+  vinculo_roto: {
+    build(arg) {
+      const p = G.relations && G.relations.people && G.relations.people[arg];
+      if (!p || p.stage === 'ended') return null;
+      return {
+        title: '❤ Se enfría',
+        text: `${firstName(p)} lleva días distinta. Esta noche lo dice: «No puedo con esto. Con lo que te has vuelto. Te miro y ya no te encuentro.»\n\nLa vida que llevas tiene un precio, y a veces lo paga quien no debía.`,
+        opts: [
+          { t: 'Dejarla ir', fx() { return breakup(arg); } },
+          { t: 'Rogarle que se quede (Labia)', fx() {
+              const pl = player();
+              if (pl.skills.labia + rint(0, 30) >= 55) { p.af = Math.max(4, p.af - 2); return `Hablas como no sueles hablar: sin armas. ${firstName(p)} llora un poco y se queda. «Una más», dice. «La última que te fío.» Ganaste tiempo. No absolución.`; }
+              return breakup(arg);
+            } }
+        ]
       };
     }
   },
