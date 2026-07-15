@@ -85,6 +85,22 @@ export function genRecruit() {
   return r;
 }
 
+// Un amigo del alma puede unirse a la banda: su vínculo se vuelve escuadra.
+export function recruitFromPerson(p) {
+  const r = genRecruit();
+  r.name = p.name;
+  r.alias = '';
+  r.loyalty = 70; // ya te quieren; por eso vienen
+  r.fromPerson = p.key;
+  r.bio = [
+    `lo conociste en ${p.where} y os hicisteis amigos antes que compañeros`,
+    p.herida ? `arrastra que ${p.herida}` : 'no cuenta de dónde viene',
+    p.tag || 'tiene su propia forma de mirar el mundo'
+  ];
+  r.bioKnown = 1; // a un amigo ya lo conoces un poco
+  return r;
+}
+
 // ---------- arco de mejora: aprender haciendo ----------
 export function addXp(ch, sk, n) {
   if (!ch.alive) return;

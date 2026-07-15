@@ -16,7 +16,19 @@ export const SEEDED = [
     herida: 'perdió a un hermano a manos de un hombre como tú', reto: 'tu forma de vida es todo lo que ella combate' },
   { key: 'cole', name: 'Cole Ferris', pron: 'él', where: 'la feria',
     tag: 'herrero de manos anchas y risa fácil', deseo: 'una fragua sin deudas y una casa con porche',
-    herida: 'enviudó joven; guarda el delantal de su marido', reto: 'ya perdió a uno; le aterra volver a querer' }
+    herida: 'enviudó joven; guarda el delantal de su marido', reto: 'ya perdió a uno; le aterra volver a querer' },
+  { key: 'mabel', name: 'Mabel Crick', pron: 'ella', romanceable: false, where: 'la cantina',
+    tag: 'vieja que lo sabe todo y no lo dice gratis', deseo: 'que la escuchen antes de morirse',
+    herida: 'enterró a tres maridos y a un hijo', reto: 'no aguanta a los que presumen de duros' },
+  { key: 'toby2', name: 'Gus Pardo', pron: 'él', romanceable: false, where: 'el almacén',
+    tag: 'crío espabilado que corre recados', deseo: 'una pistola y que lo tomen en serio',
+    herida: 'sin padres, se cría solo', reto: 'te admira demasiado; eso también es un peligro' },
+  { key: 'silas2', name: 'Silas Rourke', pron: 'él', romanceable: false, where: 'Bent Fork',
+    tag: 'granjero terco de mandíbula cuadrada', deseo: 'que la Blackvein no le quite la tierra',
+    herida: 'perdió una mano en la mina', reto: 'desconfía de todo el que lleve revólver' },
+  { key: 'vera', name: 'Vera Sunn', pron: 'ella', where: 'un baile de granero',
+    tag: 'cantante errante de voz rota y bonita', deseo: 'un escenario de verdad en una ciudad de verdad',
+    herida: 'dejó atrás a alguien que la esperaba', reto: 'no se queda quieta en ningún sitio ni con nadie' }
 ];
 
 const NAMES_F = ['Ruth', 'Clara', 'Mabel', 'Josephine', 'Ada', 'Winnie', 'Esther', 'Lucille', 'Vera', 'Opal'];

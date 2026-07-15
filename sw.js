@@ -1,7 +1,7 @@
 /* MIROLE — service worker. Cache-first: el juego debe abrir sin internet
    en mitad del desierto, de un vuelo o del año 2060. Sube la versión al
    desplegar cambios. */
-const V = 'mirole-v0.8.1';
+const V = 'mirole-v0.9.0';
 const CORE = [
   './', 'index.html', 'css/style.css', 'manifest.webmanifest',
   'js/main.js',

@@ -263,6 +263,46 @@ export const EVENTS2 = {
     }
   },
 
+  // ---------- ❤ el enemigo que te ganaste actúa ----------
+  enemigo_actua: {
+    build(arg) {
+      const p = G.relations && G.relations.people && G.relations.people[arg];
+      if (!p || p.stage === 'ended' || p.rel > -55) return null;
+      const violent = chance(0.55);
+      if (violent) {
+        return {
+          title: `\u2620 ${p.name} viene a por ti`,
+          text: `${p.name} no lo ha olvidado. ${cap(p.reto || 'te la tenía jurada')}, y hoy ha juntado a un par de matones y las agallas.\n\n«Te avisé, forastero», dice desde la calle. «El pueblo tiene memoria. Yo más.»`,
+          opts: [{ t: 'Salir a la calle', fx() {
+            const foes = [mkFoe('pistolero', p.name), mkFoe('maton')];
+            CB.startCombat({ title: `La cuenta de ${firstName(p)}`, foes,
+              intro: 'El rencor mal cultivado también da cosecha. Aquí está la tuya.',
+              onEnd: (res) => {
+                if (res === 'win') { p.stage = 'ended'; journal(`${p.name} vino a cobrarse su rencor y lo pagó entero. Un enemigo menos; una tumba más en la cuenta que llevo.`); }
+                else { journal(`${p.name} me dio una lección hoy. Los enemigos que uno se gana a la ligera cobran caro y con intereses.`); }
+              } });
+          } }]
+        };
+      }
+      // no violento: te hunde la reputación / envenena al pueblo
+      G.rep.fama = Math.max(0, G.rep.fama - 2);
+      G.fac.pueblo = Math.max(-50, (G.fac.pueblo || 0) - 4);
+      journal(`${p.name} anda contando cosas de mí por el pueblo. Algunas ciertas, que son las que escuecen. La lengua de un enemigo hace más daño que su revólver.`);
+      return {
+        title: `\ud83d\udde3 ${firstName(p)} habla mal de ti`,
+        text: `Te llega de tres sitios distintos: ${p.name} lleva semanas envenenando tu nombre en las cantinas y los porches. Nada que puedas retar a duelo — solo palabras, que son peores.\n\nTu fama y tu buena prensa en el pueblo se resienten.`,
+        opts: [
+          { t: 'Ignorarlo. El que se pica...', fx() { return 'Dejas correr el agua. A veces la única respuesta digna al veneno es no beberlo. Pero anotas el nombre.'; } },
+          { t: 'Pagarle una visita (que tu fama hable)', fx() {
+              p.rel = Math.max(-100, p.rel - 6);
+              G.rep.humanidad = Math.max(0, G.rep.humanidad - 2);
+              return `Le dejas claro, sin tocarle un pelo, que sabes lo que dice y de dónde duerme. Calla una temporada. El miedo tapa la boca, pero no arranca el odio: eso sigue creciendo por debajo.`;
+            } }
+        ]
+      };
+    }
+  },
+
   // ---------- némesis: los que escapan, vuelven ----------
   nemesis: {
     build(arg) {

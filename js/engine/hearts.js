@@ -3,7 +3,7 @@
 // rompe o muere, y SIEMPRE aparece alguien más. El amor es un sistema.
 import { G, journal, choice, log, yearOf } from './state.js';
 import { rint, pick, chance } from './rng.js';
-import { player, addStress } from './chars.js';
+import { player, addStress, aliveSquad, recruitFromPerson } from './chars.js';
 import { SEEDED, genPerson, COURT_LINES, BREAK_LINES, FRIEND_LINES, RIVAL_LINES, standingLabel, firstName } from '../data/people.js';
 
 // Estructura: G.relations.people[key] = { ...persona, af, stage, met }
@@ -139,6 +139,18 @@ export function courtScene(key) {
       return `${firstName(p)} sonríe con pena. «Te quiero cerca... pero no así. ${cap(p.reto || 'necesito tiempo')}.»\n\nLa amistad sobrevive. El amor, hoy, no. Duele con dignidad.`;
     } });
   }
+  // ----- reclutar a un amigo del alma: el vínculo se vuelve banda -----
+  if (p.rel >= 78 && p.stage !== 'partner' && aliveSquad().filter(c => c.id !== G.player).length < 5) {
+    opts.push({ t: `🤝 Proponerle a ${firstName(p)} unirse a la banda`, fx() {
+      const r = recruitFromPerson(p);
+      G.chars[r.id] = r;
+      G.squad.push(r.id);
+      p.stage = 'joined';
+      choice(`${p.name} pasó de amigo a compañero de armas. Los mejores fichajes se hacen en una mesa, no en un tablón.`);
+      journal(`${p.name} se une a la banda. No por dinero — por lo que hay entre nosotros. Esos son los que no te fallan... y los que más duele enterrar.`);
+      return `${firstName(p)} no lo piensa mucho. «Ya me juego el pellejo por ti gratis», dice. «Al menos ahora cobraré.»\n\nAprieta tu mano como se aprieta la de un hermano. La banda tiene un miembro más — y tú, una razón más para volver vivo a casa.`;
+    } });
+  }
   // ----- pedir un favor a un amigo -----
   if (p.rel >= 55) {
     opts.push({ t: `Pedirle un favor a ${firstName(p)}`, fx() {
@@ -174,14 +186,22 @@ export function breakup(key, reasonIdx) {
   return line + `\n\nEl territorio es ancho y la gente, muchas. Ya llegará otra. Siempre llega otra. Esa es la única promesa que Red Marrow cumple.`;
 }
 
-// La vida cruel puede romper un vínculo sin que tú lo elijas: humanidad
-// muy baja, o el peligro constante, enfrían hasta lo bueno.
+// La vida cruel puede romper un vínculo sin que tú lo elijas; y los
+// enemigos que te ganaste no se quedan de brazos cruzados.
 export function heartsTick() {
   ensureHearts();
   const pt = partner();
-  if (!pt) return;
-  if (G.rep.humanidad <= 20 && chance(0.02)) {
+  if (pt && G.rep.humanidad <= 20 && chance(0.02)) {
     G.pending.push('vinculo_roto:' + G.relations.partner);
+  }
+  // Los enemigos declarados (rel muy negativo) actúan de tanto en tanto.
+  for (const p of Object.values(G.relations.people)) {
+    if (p.stage === 'ended' || p.rel > -55) continue;
+    if (p.lastActed && G.time.day - p.lastActed < 20) continue;
+    if (chance(0.08)) {
+      p.lastActed = G.time.day;
+      if (!G.pending.includes('enemigo_actua:' + p.key)) G.pending.push('enemigo_actua:' + p.key);
+    }
   }
 }
 
