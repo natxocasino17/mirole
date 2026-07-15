@@ -1,19 +1,28 @@
 // MIROLE — el tiempo pasa de verdad. Los días curan despacio, las
 // semanas cuestan dinero y los años pasan factura a los huesos.
-import { G, save, log, journal, yearOf, queueEvent } from './state.js';
+import { G, save, log, journal, yearOf, seasonOf, queueEvent } from './state.js';
 import { aliveSquad, player, ageOf } from './chars.js';
 import { chance } from './rng.js';
 import * as D from './director.js';
+
+export function isWinter(day) { return seasonOf(day ?? G.time.day) === 'Invierno'; }
 
 export function advanceDays(n, opts = {}) {
   for (let i = 0; i < n; i++) {
     G.time.day++;
     G.stats.days++;
+    // ❄️ El invierno es un enemigo más: la carne cura peor con frío y el
+    // ánimo se hiela. No mata solo — desgasta, que es su forma de matar.
+    const winter = isWinter(G.time.day);
     for (const ch of aliveSquad()) {
-      ch.hp = Math.min(ch.hpMax, ch.hp + (opts.rest ? 2 : 1));
+      const regen = (opts.rest ? 2 : 1) - (winter && !opts.rest ? 1 : 0);
+      if (regen > 0) ch.hp = Math.min(ch.hpMax, ch.hp + regen);
       if (opts.rest) {
-        const heal = ch.traits.includes('insomne') ? 4 : 8;
+        let heal = ch.traits.includes('insomne') ? 4 : 8;
+        if (winter) heal = Math.max(2, heal - 3);
         ch.stress = Math.max(0, ch.stress - heal);
+      } else if (winter && chance(0.25)) {
+        ch.stress = Math.min(100, ch.stress + 1); // el frío pesa por dentro
       }
       if (ch.recoverUntil && G.time.day >= ch.recoverUntil) {
         ch.recoverUntil = 0;
@@ -39,11 +48,17 @@ function upkeep() {
   const squad = aliveSquad();
   const wages = squad.filter(c => c.id !== G.player).reduce((n, c) => n + c.salario, 0)
     + (G.flags.ward_tobias ? 1 : 0);
-  const food = squad.length * 2 + G.pets.length + (G.horse ? G.horse.tier : 0);
+  let food = squad.length * 2 + G.pets.length + (G.horse ? G.horse.tier : 0);
+  // ❄️ En invierno la comida escasea y hay que comprar leña: todo cuesta más.
+  const winter = isWinter(G.time.day);
+  const heat = winter ? Math.ceil(food / 2) + squad.length : 0;
+  food += heat;
   const total = wages + food;
   if (G.money >= total) {
     G.money -= total;
-    log(`Pagas la semana: $${wages} en soldadas, $${food} en comida.`);
+    log(winter
+      ? `Pagas la semana de invierno: $${wages} en soldadas, $${food} en comida y leña. El frío cobra por adelantado.`
+      : `Pagas la semana: $${wages} en soldadas, $${food} en comida.`);
   } else {
     G.money = 0;
     log('No hay para pagar la semana. Las miradas en la mesa pesan.');

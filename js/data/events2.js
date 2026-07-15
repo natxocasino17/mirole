@@ -305,6 +305,51 @@ export const EVENTS2 = {
     }
   },
 
+  // ---------- ❄️ el invierno enemigo: la estación que desgasta ----------
+  invierno: {
+    build() {
+      const y = yearOf(G.time.day);
+      const squad = aliveSquad();
+      const cost = 6 + squad.length * 2;
+      const nieva = pick([
+        'La primera helada llega de noche, sin avisar, como todo lo que importa en este territorio.',
+        'El viento del norte baja de las montañas trayendo un frío que muerde a través de la gabardina.',
+        'Amanece blanco. El pozo tiene una costra de hielo y los caballos echan humo por la nariz.'
+      ]);
+      return {
+        title: '❄️ Llega el invierno',
+        text: `${nieva}\n\nEn Red Marrow el invierno no es una postal: es un acreedor. La comida sube, la leña se paga a peso de oro y las heridas curan a regañadientes. Tu gente mira el cielo plomizo y luego te mira a ti.\n\nHay que decidir cómo se pasa el frío.`,
+        opts: [
+          { t: `Comprar leña y provisiones ($${cost})`, fx() {
+              if (G.money < cost) return 'Cuentas las monedas dos veces y no salen. Este invierno se pasa a pelo, como los pobres de verdad. Que Dios y la lumbre pequeña os amparen.';
+              G.money -= cost;
+              for (const c of squad) c.stress = Math.max(0, c.stress - 5);
+              journal(`Compré leña para el invierno. $${cost} que se van en humo, literal. Pero mi gente dormirá caliente, y un hombre caliente aguanta cosas que uno helado no.`);
+              return 'La cabaña huele a resina y a humo. Por una vez, dentro se está mejor que fuera.\n\nLa banda se apiña junto al fuego y alguien saca una petaca. El invierno sigue ahí afuera, arañando la puerta — pero esta noche no entra. (−5 estrés a todos)';
+            } },
+          { t: 'Salir a cazar para el invierno', fx() {
+              const p = player();
+              const good = p.skills.punteria + rint(0, 40) >= 55;
+              if (good) {
+                const meat = rint(8, 16);
+                G.money += meat;
+                G.stats.earned += meat;
+                for (const c of squad) c.stress = Math.max(0, c.stress - 3);
+                return `Rastreas un ciervo medio día y lo cobras de un tiro limpio a cien metros. La carne da para semanas y las pieles se venden ($${meat}).\n\nVolvéis con el trineo cargado y esa satisfacción vieja del que se ha ganado el pan con las manos. (−3 estrés a todos)`;
+              }
+              addStress(p, 6);
+              return 'El monte en invierno no perdona. Vuelves con las manos vacías, los pies helados y un catarro que te durará hasta la primavera.\n\nLa despensa sigue igual de flaca. A veces cazar es solo pasar frío con más pasos. (+6 estrés)';
+            } },
+          { t: 'Aguantar. Ya hemos pasado inviernos peores.', fx() {
+              for (const c of squad) c.stress = Math.min(100, c.stress + 3);
+              journal(`Otro invierno a pelo. Nos apretamos, comemos menos y esperamos a la primavera como se espera a un amigo que siempre llega tarde. ${y}. Que sea el último así.`);
+              return 'No gastas ni una moneda. El orgullo abriga poco, pero abriga.\n\nSerá un invierno largo, de sopa aguada y turnos de guardia con los dientes castañeando. Habéis pasado peores. Habrá que pasar este también. (+3 estrés a todos)';
+            } }
+        ]
+      };
+    }
+  },
+
   // ---------- el ocaso: el tiempo, el único que gana siempre ----------
   ocaso: {
     build() {

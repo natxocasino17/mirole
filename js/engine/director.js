@@ -2,7 +2,7 @@
 // Lee tu dinero, tu estrés, las lealtades y los secretos de tu gente, y
 // genera la siguiente escena de tu vida. La traición jamás sale de un
 // dado: sale de un secreto que siempre estuvo ahí, más la ocasión.
-import { G, queueEvent, onceDone, yearOf } from './state.js';
+import { G, queueEvent, onceDone, yearOf, seasonOf } from './state.js';
 import { chance, pick } from './rng.js';
 import { aliveSquad, player } from './chars.js';
 import { DAILY_POOL, MYTHIC_POOL, EVENTS } from '../data/events.js';
@@ -23,6 +23,13 @@ export function dailyTick() {
     ensureTerritory();
     drift();
     if (!G.flags.t2intro) { G.flags.t2intro = true; queueEvent('t2_intro'); }
+  }
+
+  // ❄️ El invierno enemigo: al entrar la estación fría, el territorio
+  // aprieta. Se avisa una vez por año; el desgaste ya vive en time.js.
+  if (seasonOf(G.time.day) === 'Invierno' && G.flags.winterYr !== yearOf(G.time.day)) {
+    G.flags.winterYr = yearOf(G.time.day);
+    queueEvent('invierno');
   }
 
   // 🎪 Cada dos semanas, el pueblo respira: día de feria.
