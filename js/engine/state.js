@@ -5,7 +5,7 @@
 import { seedRng, rngState, setRngState } from './rng.js';
 
 export const SCHEMA = 5;
-export const VERSION = '0.8.0';
+export const VERSION = '0.8.1';
 const KEY = 'mirole_save';
 
 export let G = null;

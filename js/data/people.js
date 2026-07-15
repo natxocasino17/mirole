@@ -73,5 +73,32 @@ export const BREAK_LINES = [
   (p) => `Lo tuyo con ${firstName(p)} se apaga como se apagan las cosas de verdad: sin portazo, a base de noches en que uno de los dos ya no vino. El territorio está lleno de eso.`
 ];
 
+// Relación general (no romántica): amistad que se forja compartiendo.
+export const FRIEND_LINES = [
+  (p) => `${firstName(p)} te invita a la mesa sin que lo pidas. «Los que caen bien escasean por aquí», dice. «Aprovecho.»`,
+  (p) => `Compartís silencio y tabaco en el porche. Con ${firstName(p)} no hace falta llenar el aire. Eso, en un amigo, vale oro.`,
+  (p) => `${firstName(p)} te cuenta un secreto del pueblo que no debía. «Porque me fío de ti. No me hagas quedar por tonto.»`,
+  (p) => `Os reís de los mismos desgraciados. La amistad, al final, es coincidir en a quién despreciar.`,
+  (p) => `«Si alguna vez lo necesitas», dice ${firstName(p)} sin mirarte, «sabes dónde vivo.» No lo dice a cualquiera. Lo sabes.`
+];
+
+// Y la rivalidad, que también se cultiva — a veces sin querer.
+export const RIVAL_LINES = [
+  (p) => `${firstName(p)} te aguanta la mirada más de la cuenta. «No me caes bien, forastero. Y no soy de fingir.»`,
+  (p) => `Cada palabra con ${firstName(p)} es un pulso. Ninguno de los dos parpadea. El aire se pone denso.`,
+  (p) => `${firstName(p)} escupe cerca de tu bota. No encima — todavía. «Ándate con ojo. El pueblo tiene memoria, y yo más.»`,
+  (p) => `«He oído lo que haces», dice ${firstName(p)} con desprecio de los baratos. «Y no me impresiona. Los tipos como tú duran poco.»`
+];
+
+// Umbrales de estanding: de enemigo declarado a amigo del alma.
+export function standingLabel(rel) {
+  if (rel <= -60) return { t: 'enemigo', cls: 'red' };
+  if (rel <= -20) return { t: 'te la tiene jurada', cls: 'red' };
+  if (rel < 20) return { t: 'neutral', cls: 'dim' };
+  if (rel < 50) return { t: 'cordial', cls: '' };
+  if (rel < 80) return { t: 'amigo', cls: 'green' };
+  return { t: 'amigo del alma', cls: 'green' };
+}
+
 export function firstName(p) { return p.name.split(' ')[0]; }
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }

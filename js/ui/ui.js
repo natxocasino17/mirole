@@ -713,11 +713,12 @@ function banda() {
   html += `<h3>❤ Vínculos</h3>`;
   if (pt) html += `<div class="card special"><div class="title">${pt.name} · pareja</div><div class="small dim">${pt.tag}</div><div class="row"><span class="dim">Vuestra vida cabe en las noches que el territorio os deja.</span><button data-heart="${pt.key}">Ver</button></div></div>`;
   const otros = cands.filter(p => !pt || p.key !== pt.key);
-  if (!otros.length && !pt) html += `<div class="panel small dim">No conoces a nadie... todavía. La gente aparece sola, en la cantina, la feria, los caminos. El territorio es ancho y está lleno de vidas.</div>`;
+  if (!otros.length && !pt) html += `<div class="panel small dim">No conoces a nadie... todavía. La gente aparece sola, en la cantina, la feria, los caminos. El territorio es ancho y está lleno de vidas — amigos, rivales, quizá algo más.</div>`;
   for (const p of otros) {
+    const st = HEARTS.standing(p);
     html += `<div class="card"><div class="title">${p.name}</div><div class="small dim">${p.tag} · ${p.where}</div>
-      <div class="row"><span class="dim">${p.stage === 'ended' ? 'ya no os veis' : 'Afinidad ' + ('♥'.repeat(Math.ceil(p.af / 3)) || '·')}</span>
-      ${p.stage !== 'ended' ? `<button data-heart="${p.key}">Cortejar</button>` : ''}</div></div>`;
+      <div class="row"><span class="${st.cls}">${p.stage === 'ended' ? 'ya no os veis' : st.t}${p.romanceable && p.af > 0 && p.rel >= 30 ? ' · ♥' : ''}</span>
+      ${p.stage !== 'ended' ? `<button data-heart="${p.key}">Tratar</button>` : ''}</div></div>`;
   }
   html += `<h3>📦 Alforjas comunes</h3><div class="panel small">${
     g.stash.length ? g.stash.map(it => itemName(it) + (it.kind === 'weapon' ? ` (${it.broken ? 'ROTA' : it.dur + '%'})` : '')).join(' · ') : 'Vacías. Como las promesas de la Blackvein.'
