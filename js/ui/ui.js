@@ -15,6 +15,7 @@ import { bjDeal, bjHit, bjStand, bjValue, bjResult, genFight, simFight } from '.
 import { practice, quickdraw } from '../engine/range.js';
 import * as EMP from '../engine/empire.js';
 import * as HEARTS from '../engine/hearts.js';
+import * as FAM from '../engine/family.js';
 import { TOWNS, GANGS, TOWN_ORDER } from '../data/gangs.js';
 import { WEAPONS, GOODS, ROPA, UPGRADES, HORSES, SHOP_ALMACEN, SHOP_ARMERO, SHOP_SASTRE,
          mkWeapon, mkGood, mkRopa, itemName, itemDef, effAcc, effMag, effJam, effDurMax } from '../data/items.js';
@@ -720,6 +721,27 @@ function banda() {
       <div class="row"><span class="${st.cls}">${p.stage === 'ended' ? 'ya no os veis' : st.t}${p.romanceable && p.af > 0 && p.rel >= 30 ? ' · ♥' : ''}</span>
       ${p.stage !== 'ended' ? `<button data-heart="${p.key}">Tratar</button>` : ''}</div></div>`;
   }
+  // 👪 Familia y dinastía: matrimonio, hijos, herederos.
+  FAM.ensureFamily();
+  const spouse = g.family.spouse;
+  const kids = FAM.childrenAlive();
+  if (pt || spouse || kids.length) {
+    html += `<h3>👪 Familia · Generación ${g.family.generation}</h3>`;
+    if (spouse) html += `<div class="panel small">💍 Casad@ con <b>${spouse.name}</b>.</div>`;
+    else if (pt) html += `<div class="card"><div class="row"><span>Podrías casarte con <b>${pt.name}</b>.</span><button data-fam="marry">💍 Casaros</button></div></div>`;
+    if (kids.length) {
+      html += `<div class="panel small">` + kids.map(c => {
+        const age = FAM.childAge(c);
+        const heir = FAM.eldestHeir();
+        return `${c.sex === 'f' ? '👧' : '👦'} ${c.name} (${age} año${age === 1 ? '' : 's'})${heir === c ? ' · <span class="amber">heredero/a</span>' : ''}`;
+      }).join('<br>') + `</div>`;
+    }
+    if (spouse) {
+      const canKid = !g.flags.lastChildYear || S.yearOf(g.time.day) > g.flags.lastChildYear;
+      html += `<div class="grid"><button data-fam="child" ${canKid ? '' : 'disabled'}>👶 Formar familia (tener un hijo/a)<br><span class="dim small">${canKid ? 'Traer al mundo a alguien nuevo.' : 'Este año ya. Dale tiempo al tiempo.'}</span></button></div>`;
+    }
+  }
+
   html += `<h3>📦 Alforjas comunes</h3><div class="panel small">${
     g.stash.length ? g.stash.map(it => itemName(it) + (it.kind === 'weapon' ? ` (${it.broken ? 'ROTA' : it.dur + '%'})` : '')).join(' · ') : 'Vacías. Como las promesas de la Blackvein.'
   }</div>`;
@@ -727,6 +749,23 @@ function banda() {
   $('screen').querySelectorAll('[data-ch]').forEach(el => el.onclick = () => { detailChar = +el.dataset.ch; renderAll(); });
   $('screen').querySelectorAll('button[data-heart]').forEach(b => b.onclick = () => {
     showScene(HEARTS.courtScene(b.dataset.heart), () => {});
+  });
+  $('screen').querySelectorAll('button[data-fam]').forEach(b => b.onclick = () => {
+    const a = b.dataset.fam;
+    if (a === 'marry') {
+      const sp = FAM.marry();
+      showScene({ title: '💍 La boda', text: sp ? `Te casas con ${sp.name}. No hay flores caras ni catedral — hay una promesa dicha en serio en una tierra que no perdona las promesas rotas. Es más que suficiente. Es casi todo.` : 'No hay con quién, todavía.' }, () => {});
+    }
+    if (a === 'child') {
+      if (chance(0.8)) {
+        const kid = FAM.haveChild();
+        g.flags.lastChildYear = S.yearOf(g.time.day);
+        showScene({ title: '👶 Ha nacido', text: `Ha nacido ${kid.name}. Peso de pluma, grito de trueno. La comadrona dice que tiene tus manos. Ojalá tenga menos cicatrices que ellas.\n\nEn BANDA → Familia lo verás crecer con los años. Cuando cumpla dieciséis, podrá heredarlo todo.` }, () => {});
+      } else {
+        showScene({ title: 'Todavía no', text: 'Lo intentáis. La vida tiene sus tiempos y este año no tocó. No pasa nada: hay pocas cosas más bonitas que seguir intentándolo.' }, () => {});
+      }
+    }
+    renderAll();
   });
 }
 
@@ -880,9 +919,14 @@ function diario() {
 
 // ==================== MENÚ ====================
 function menu() {
+  const heir = FAM.eldestHeir();
+  const traspasoBtn = heir
+    ? `<button class="wide special" data-m="traspaso">👑 El Traspaso — pasar la antorcha<br><span class="dim small">${heir.name} (${FAM.childAge(heir)}) puede heredar la gabardina cuando estés listo.</span></button>`
+    : '';
   $('screen').innerHTML = `<h2>⚙️ MENÚ</h2>
     <div class="flavor">Tu partida es un archivo JSON. Es tuya. Llévatela a donde vayas, hasta 2060.</div>
     <div class="grid">
+      ${traspasoBtn}
       <button class="wide" data-m="export">💾 Extraer partida (descargar .json)</button>
       <button class="wide" data-m="import">📂 Importar partida</button>
       <button class="wide" data-m="reset">🔥 Nueva partida (borra la actual)</button>
@@ -898,6 +942,20 @@ function menu() {
   $('screen').querySelectorAll('button[data-m]').forEach(b => b.onclick = () => {
     if (b.dataset.m === 'export') S.exportSave();
     if (b.dataset.m === 'import') $('fileImp2').click();
+    if (b.dataset.m === 'traspaso') {
+      const h = FAM.eldestHeir();
+      showScene({
+        title: '👑 El Traspaso',
+        text: `${h.name} tiene ${FAM.childAge(h)} años y las manos firmes. Tú tienes el cuerpo lleno de plazos vencidos.\n\nPasar la antorcha significa retirarte: ${h.name} toma el mando, hereda el dinero, las alforjas, media de tu fama, TODAS tus enemistades y el cementerio entero. Tú te vuelves una de las historias que se cuentan en «El Cuervo».\n\nLa dinastía continúa. Tú descansas. ¿Ha llegado el día?`,
+        opts: [
+          { t: `Sí. Que ${h.name} tome la gabardina.`, fx() {
+              FAM.doTraspaso(h, 'Se retiró en paz, con la sangre en buenas manos');
+            } },
+          { t: 'Todavía no. Un año más en la silla.' }
+        ]
+      }, () => renderAll());
+      return;
+    }
     if (b.dataset.m === 'reset') {
       showScene({
         title: '¿Quemar esta vida?',

@@ -85,6 +85,19 @@ export function genRecruit() {
   return r;
 }
 
+// El heredero: cuando el mayor toma la gabardina. Nace con lo que le
+// enseñaron — algo de la sangre, algo del apellido, todo el peso.
+export function makeHeir(name, birthYear, inheritWeapon) {
+  const h = makeChar({
+    name, alias: '', role: 'líder',
+    birthYear, hp: 8, hpMax: 8,
+    skills: { punteria: 40, reflejos: 42, voluntad: 42, vigor: 42, labia: 34, sigilo: 32 },
+    gear: { weapon: inheritWeapon || mkWeapon('colt_saa'), blanca: mkWeapon('bowie') },
+    portrait: 'assets/portraits/vane.png', sprite: 'assets/sprites/vane_full.png'
+  });
+  return h;
+}
+
 // Un amigo del alma puede unirse a la banda: su vínculo se vuelve escuadra.
 export function recruitFromPerson(p) {
   const r = genRecruit();

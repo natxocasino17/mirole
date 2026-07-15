@@ -8,9 +8,11 @@ import { mkFoe } from './enemies.js';
 import { GANGS } from './gangs.js';
 import { introduce, breakup } from '../engine/hearts.js';
 import { firstName } from './people.js';
+import { eldestHeir, doTraspaso, childAge } from '../engine/family.js';
 import * as CB from '../engine/combat.js';
 
 const bondKey = (a, b) => `${Math.min(a, b)}-${Math.max(a, b)}`;
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
 // ---------- el periódico: tu leyenda, mal escrita por otros ----------
 const CLASSIFIEDS = [
@@ -298,6 +300,47 @@ export const EVENTS2 = {
               G.rep.humanidad = Math.max(0, G.rep.humanidad - 2);
               return `Le dejas claro, sin tocarle un pelo, que sabes lo que dice y de dónde duerme. Calla una temporada. El miedo tapa la boca, pero no arranca el odio: eso sigue creciendo por debajo.`;
             } }
+        ]
+      };
+    }
+  },
+
+  // ---------- el ocaso: el tiempo, el único que gana siempre ----------
+  ocaso: {
+    build() {
+      const p = player();
+      if (!p || !p.alive) return null;
+      const age = yearOf(G.time.day) - p.birthYear;
+      const heir = eldestHeir();
+      // Sin hijo que herede: no hay traspaso, solo un hombre que se hace viejo.
+      if (!heir) {
+        p.skills.vigor = Math.max(15, p.skills.vigor - 2);
+        p.skills.reflejos = Math.max(15, p.skills.reflejos - 2);
+        return {
+          title: '🕯️ El ocaso',
+          text: `${age} años. Un día cualquiera, subiendo al caballo, el cuerpo te avisa: ya no eres el de antes. Ninguno lo es, pero pocos llegan a viejos en este oficio para comprobarlo.\n\nNo tienes sangre que herede la gabardina — todavía. Y sin nadie a quien pasársela, solo queda una cosa: seguir. Más despacio, más listo, más leyenda que hombre.\n\nEn Red Marrow, a los viejos que aún respiran los llaman por su nombre en voz baja. Tú ya eres uno de esos nombres.`,
+          opts: [{ t: 'Seguir en pie, un año más', fx() {
+            journal(`${age} años y sigo aquí. El territorio se ha llevado a casi todos los de mi quinta. A mí me esquiva, o me guarda para algo. Aún no sé cuál de las dos cosas es peor.`);
+            return 'Aprietas la mandíbula y sigues. Es lo único que siempre supiste hacer.';
+          } }]
+        };
+      }
+      // Hay heredero mayor: la ocasión de pasar la gabardina en vida.
+      return {
+        title: '🕯️ El ocaso',
+        text: `${age} años. Miras a ${heir.name} — ${childAge(heir)} años ya, la mirada firme, las manos que aprendieron viéndote — y por primera vez piensas en la palabra que nunca dices: retiro.\n\nNo es cobardía. Es aritmética. Tarde o temprano una bala, o el invierno, o los años, te sentarán en el porche para siempre. Mejor elegir tú el día que dejárselo a la mala suerte.\n\nPuedes pasarle la gabardina a ${heir.name} ahora, en vida, y enseñarle lo que aún te quede por enseñar desde la mecedora. O apurar el revólver un año más, porque todavía te tiembla menos el pulso que a cualquiera de los jóvenes.`,
+        opts: [
+          { t: `Pasar la gabardina a ${heir.name} (EL TRASPASO)`, fx() {
+            const nh = doTraspaso(heir, 'Se retiró en vida, algo que casi nadie en este oficio consigue');
+            return nh
+              ? `Le pones el revólver en la mano y no dices ningún discurso — nunca se te dieron bien. Solo: «No dejes que te quieran demasiado. Duele más cuando faltan.»\n\n${nh.name} asiente. Ya es quien manda. Y tú, por primera vez en cuarenta años, no tienes que estar en guardia.\n\nEmpieza la generación ${G.family.generation}.`
+              : null;
+          } },
+          { t: 'Un año más. Aún no.', fx() {
+            p.skills.vigor = Math.max(15, p.skills.vigor - 1);
+            journal(`Podía haber pasado la gabardina a ${heir.name} hoy. No lo hice. Todavía hay cosas que solo sé hacer yo — o eso me digo para no bajarme del caballo. El orgullo es lo último que se entierra.`);
+            return `${heir.name} no dice nada, pero lo entiende: los viejos lobos no se retiran, se los retira. Tú aún no. Un año más.`;
+          } }
         ]
       };
     }

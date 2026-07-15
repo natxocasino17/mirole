@@ -1,7 +1,7 @@
 /* MIROLE — service worker. Cache-first: el juego debe abrir sin internet
    en mitad del desierto, de un vuelo o del año 2060. Sube la versión al
    desplegar cambios. */
-const V = 'mirole-v0.9.0';
+const V = 'mirole-v0.10.0';
 const CORE = [
   './', 'index.html', 'css/style.css', 'manifest.webmanifest',
   'js/main.js',
@@ -11,7 +11,7 @@ const CORE = [
   'js/data/items.js', 'js/data/names.js', 'js/data/enemies.js',
   'js/data/dialogs.js', 'js/data/events.js', 'js/data/prologue.js',
   'js/data/sidequests.js', 'js/data/tomo1.js', 'js/data/npcs.js', 'js/data/events2.js', 'js/data/gangs.js', 'js/data/people.js',
-  'js/engine/hearts.js',
+  'js/engine/hearts.js', 'js/engine/family.js',
   'js/ui/ui.js',
   'assets/portraits/vane.png', 'assets/sprites/vane_full.png'
 ];

@@ -4,8 +4,8 @@
 // migraciones de esquema viven aquí para siempre.
 import { seedRng, rngState, setRngState } from './rng.js';
 
-export const SCHEMA = 5;
-export const VERSION = '0.9.0';
+export const SCHEMA = 6;
+export const VERSION = '0.10.0';
 const KEY = 'mirole_save';
 
 export let G = null;
@@ -26,6 +26,7 @@ export function baseState() {
     sideOffer: null, sideDay: -99,
     choices: [],
     bonds: {}, nemeses: [], relations: {}, territory: null,
+    family: { spouse: null, children: [], generation: 1 },
     daily: { day: 0, whisky: 0, talks: [], clean: false, rumor: false, pet: false },
     pets: [], horse: null,
     cemetery: [], journal: [], log: [],
@@ -92,6 +93,11 @@ export function migrate(s) {
     // La guerra de facciones del Tomo II: se activa al cerrar el Tomo I.
     s.territory = null;
     s.schema = 5;
+  }
+  if (s.schema === 5) {
+    // Familia y dinastía: matrimonio, hijos, el Traspaso generacional.
+    s.family = { spouse: null, children: [], generation: 1 };
+    s.schema = 6;
   }
   return s;
 }

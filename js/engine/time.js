@@ -1,7 +1,8 @@
 // MIROLE — el tiempo pasa de verdad. Los días curan despacio, las
 // semanas cuestan dinero y los años pasan factura a los huesos.
-import { G, save, log, journal, yearOf } from './state.js';
+import { G, save, log, journal, yearOf, queueEvent } from './state.js';
 import { aliveSquad, player, ageOf } from './chars.js';
+import { chance } from './rng.js';
 import * as D from './director.js';
 
 export function advanceDays(n, opts = {}) {
@@ -66,6 +67,17 @@ function newYear() {
         if (age % 2 === 0) ch.skills.punteria = Math.max(15, ch.skills.punteria - 1);
       }
       if (ch.id === G.player) log('Al levantarte, los huesos opinan. Ninguno a favor.');
+    }
+  }
+  // El ocaso del protagonista: pasados los 58, cada invierno pesa más.
+  // No es una bala perdida — es el tiempo, el único que gana siempre. Si
+  // hay un hijo mayor, llega la ocasión de pasar la gabardina en vida.
+  const you = player();
+  if (you && you.alive) {
+    const yourAge = ageOf(you);
+    if (yourAge >= 58 && G.flags.ocasoYr !== y && chance((yourAge - 56) * 0.05)) {
+      G.flags.ocasoYr = y;
+      queueEvent('ocaso');
     }
   }
   // El mundo avanza aunque nadie se lo pida: progreso, año a año.
