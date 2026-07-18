@@ -140,8 +140,37 @@ export function renderAll() {
 
 function resetDaily() {
   if (S.G.daily.day !== S.G.time.day) {
-    S.G.daily = { day: S.G.time.day, whisky: 0, talks: [], clean: false, rumor: false, pet: false, otis: false, rose: false, gallo: false, range: false, news: false };
+    S.G.daily = { day: S.G.time.day, energy: energyMax(), whisky: 0, talks: [], clean: false, rumor: false, pet: false, otis: false, rose: false, gallo: false, range: false, news: false };
   }
+  if (typeof S.G.daily.energy !== 'number') S.G.daily.energy = energyMax();
+}
+
+// ⚡ La energía del día: el vigor manda cuánto aguantas antes de caer
+// rendido. Envejecer y las heridas la recortan; dormir la devuelve. Así
+// los días tienen fondo: haces unas cosas, te cansas y toca dormir.
+function energyMax() {
+  const p = player();
+  if (!p) return 100;
+  let m = 80 + Math.round((p.skills.vigor || 40) * 0.3);
+  if (p.traits && p.traits.includes('insomne')) m -= 10;
+  if (p.wounds) m -= p.wounds.length * 4;
+  return Math.max(40, m);
+}
+
+// Coste de energía por acción. Devuelve true si pudo pagarse.
+const ENERGY_COST = {
+  rest: 0, poker: 10, bj: 10, gallo: 12, range: 16, clean: 14,
+  whisky: 4, rumor: 8, otis: 6, news: 5, rose: 12, talk: 6, pet: 3
+};
+function spendEnergy(n) {
+  S.G.daily.energy = Math.max(0, (S.G.daily.energy || 0) - n);
+}
+function tooTired(n) { return (S.G.daily.energy || 0) < n; }
+// Un trabajo agota de verdad (35). Si no queda cuerda, a dormir primero.
+function jobTooTired() {
+  if (!tooTired(35)) return false;
+  showScene({ title: '⚡ Demasiado cansado para esto', text: 'Un trabajo así pide el cuerpo entero, y el tuyo hoy ya no da. Salir agotado a la faena es cómo se llenan los cementerios.\n\nDuerme y vuelve mañana con las manos firmes.' }, () => {});
+  return true;
 }
 
 function hud() {
@@ -156,6 +185,7 @@ function hud() {
       <div class="nameline"><span class="name">${p.name.toUpperCase()}</span><span class="cash">$${S.G.money}</span></div>
       <div class="bar hp"><i style="width:${p.hp / p.hpMax * 100}%"></i><span>${p.hp}/${p.hpMax}</span></div>
       <div class="bar st"><i style="width:${p.stress}%"></i><span>${p.stress}</span></div>
+      <div class="bar en${(S.G.daily.energy || 0) <= energyMax() * 0.25 ? ' low' : ''}"><i style="width:${Math.min(100, (S.G.daily.energy || 0) / energyMax() * 100)}%"></i><span>⚡${S.G.daily.energy || 0}</span></div>
       <div class="date">${S.dateStr()} · Fama ${S.G.rep.fama} · Humanidad ${S.G.rep.humanidad}</div>
     </div>`;
 }
@@ -242,7 +272,8 @@ function cantina() {
   const roseOpen = dow === 0 || dow === 2 || dow === 5; // el piso: domingo, martes, viernes
   const rangeOpen = dow === 1 || dow === 4;            // práctica: lunes y jueves
   let html = `<h2>«EL CUERVO» — Marrow Creek</h2><div class="flavor">${DOW[dow]}. ${mood}</div><div class="grid">`;
-  html += `<button data-a="rest">🛏️ Descansar<br><span class="dim small">Dormir hasta mañana. Cura y calma.</span></button>`;
+  const tired = (g.daily.energy || 0) <= energyMax() * 0.3;
+  html += `<button data-a="rest" ${tired ? 'class="special"' : ''}>🛏️ Descansar<br><span class="dim small">${tired ? 'Estás molido. Duerme y recupera la cuerda.' : `Dormir hasta mañana. Cura y calma. ⚡${g.daily.energy}`}</span></button>`;
   html += `<button data-a="whisky" ${g.daily.whisky >= 3 || g.money < 3 ? 'disabled' : ''}>🥃 Whisky ($3)<br><span class="dim small">−12 estrés. ${3 - g.daily.whisky} restantes hoy.</span></button>`;
   html += `<button data-a="poker" ${g.money < 5 ? 'disabled' : ''}>🃏 Póker<br><span class="dim small">Siempre abierto. Cinco cartas.</span></button>`;
   html += `<button data-a="bj" ${g.money < 5 ? 'disabled' : ''}>🂡 Blackjack<br><span class="dim small">Siempre abierto. Veintiuno.</span></button>`;
@@ -269,11 +300,21 @@ function cantina() {
 
 function cantinaAct(d) {
   const g = S.G, p = player();
+  // ⚡ ¿Queda cuerda para hoy? Todo lo que no sea dormir gasta energía.
+  // Si estás agotado, el juego te empuja a la cama en vez de dejarte
+  // encadenar acciones hasta el infinito.
+  const cost = ENERGY_COST[d.a] ?? 6;
+  if (d.a !== 'rest' && tooTired(cost)) {
+    showScene({ title: '⚡ No puedes más', text: `Los párpados pesan como sacos de mineral y las manos ya no obedecen del todo. Por hoy se acabó: lo único sensato es <b>Descansar</b>.\n\nEn Red Marrow, el que fuerza la máquina cansado acaba cometiendo el error que no perdona.` }, () => {});
+    return;
+  }
   if (d.a === 'rest') {
     T.restDay();
     JB.maybeRefreshJobs();
     // El cementerio también habla: a veces, dormir es visitarlo.
     if (chance(0.12) && g.cemetery.some(t => !t.animal)) S.queueEvent('sueno');
+  } else {
+    spendEnergy(cost);
   }
   if (d.a === 'whisky') {
     g.money -= 3; g.daily.whisky++;
@@ -484,12 +525,14 @@ function mapa() {
 
   $('screen').innerHTML = html;
   $('screen').querySelectorAll('button[data-job]').forEach(b => b.onclick = () => {
+    if (jobTooTired()) return;
     const j = g.jobs.find(x => x.id === +b.dataset.job);
-    if (j) JB.startJob(j, showScene);
+    if (j) { spendEnergy(35); JB.startJob(j, showScene); }
   });
   $('screen').querySelectorAll('button[data-wanted]').forEach(b => b.onclick = () => {
+    if (jobTooTired()) return;
     const w = g.wanted.find(x => x.id === +b.dataset.wanted);
-    if (w) JB.startWanted(w, showScene);
+    if (w) { spendEnergy(35); JB.startWanted(w, showScene); }
   });
   const capBtn = $('screen').querySelector('button[data-cap]');
   if (capBtn) capBtn.onclick = () => {
