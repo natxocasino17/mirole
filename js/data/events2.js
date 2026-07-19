@@ -9,6 +9,7 @@ import { GANGS } from './gangs.js';
 import { introduce, breakup } from '../engine/hearts.js';
 import { firstName } from './people.js';
 import { eldestHeir, doTraspaso, childAge } from '../engine/family.js';
+import { warFlavor } from '../engine/cronista.js';
 import * as CB from '../engine/combat.js';
 
 const bondKey = (a, b) => `${Math.min(a, b)}-${Math.max(a, b)}`;
@@ -217,7 +218,7 @@ export const EVENTS2 = {
       if (!g) return null;
       return {
         title: `⚔ ${g.name} responde`,
-        text: `No les ha gustado tu método. ${g.leader} manda un mensaje de vuelta — con jinetes, no con palabras. Te esperan a las afueras.\n\n«${g.tag}.» El que manda escupe en el polvo. «Aquí no todo se toma a golpes, forastero. Algunos todavía sabemos defender lo nuestro.»`,
+        text: `No les ha gustado tu método. ${warFlavor(g)}\n\n«${g.tag}.» El que manda escupe en el polvo. «Aquí no todo se toma a golpes, forastero. Algunos todavía sabemos defender lo nuestro.»`,
         opts: [{ t: 'Recibirlos', fx() {
           const foes = [mkFoe('veterano', `Hombre de ${g.leader.split(' ')[0]}`), mkFoe('pistolero'), mkFoe('maton')];
           CB.startCombat({

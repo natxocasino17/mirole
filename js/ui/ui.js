@@ -16,6 +16,7 @@ import { practice, quickdraw } from '../engine/range.js';
 import * as EMP from '../engine/empire.js';
 import * as HEARTS from '../engine/hearts.js';
 import * as FAM from '../engine/family.js';
+import * as CRON from '../engine/cronista.js';
 import { TOWNS, GANGS, TOWN_ORDER } from '../data/gangs.js';
 import { WEAPONS, GOODS, ROPA, UPGRADES, HORSES, SHOP_ALMACEN, SHOP_ARMERO, SHOP_SASTRE,
          mkWeapon, mkGood, mkRopa, itemName, itemDef, effAcc, effMag, effJam, effDurMax } from '../data/items.js';
@@ -338,7 +339,8 @@ function cantinaAct(d) {
   }
   if (d.a === 'rumor') {
     g.money -= 2; g.daily.rumor = true;
-    const r = pick(RUMORS);
+    // El Cronista lee tu partida y te cuenta lo que el pueblo cuenta de TI.
+    const r = CRON.rumor() || pick(RUMORS);
     S.log('Pagaste un whisky por un rumor.');
     showScene({ title: '👂 Lo que se cuenta', text: r }, () => {});
   }
@@ -374,15 +376,22 @@ function talk(id) {
   c.loyalty = Math.min(100, c.loyalty + 2);
   let line;
   if (c.name === 'Eli Marsh') {
-    const tiers = ELI_TALKS.filter(t => c.loyalty >= t.min);
-    line = pick(tiers[tiers.length - 1].lines);
+    if (chance(0.4)) line = CRON.talkLine(c);
+    if (!line) {
+      const tiers = ELI_TALKS.filter(t => c.loyalty >= t.min);
+      line = pick(tiers[tiers.length - 1].lines);
+    }
   } else if (c.bio && c.bioKnown < 3 && c.loyalty >= 40 && chance(0.6)) {
     // La confianza abre la novela corta que cada uno lleva dentro.
     line = `Baja la voz, gira el vaso, y te cuenta algo de verdad: ${c.bio[c.bioKnown]}.`;
     c.bioKnown++;
   } else {
-    const pool = c.loyalty >= 75 ? RECRUIT_TALKS.high : c.loyalty >= 50 ? RECRUIT_TALKS.mid : RECRUIT_TALKS.low;
-    line = pick(pool);
+    // El Cronista primero: que te hablen de VUESTRA vida, no de una cualquiera.
+    if (chance(0.65)) line = CRON.talkLine(c);
+    if (!line) {
+      const pool = c.loyalty >= 75 ? RECRUIT_TALKS.high : c.loyalty >= 50 ? RECRUIT_TALKS.mid : RECRUIT_TALKS.low;
+      line = pick(pool);
+    }
   }
   showScene({ title: c.alias || c.name, text: line }, () => {});
 }

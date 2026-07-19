@@ -9,6 +9,7 @@ import { WEAPONS, GOODS, ROPA, LOOT_GOODS, LOOT_TALISMANS, mkGood, mkRopa, mkWea
 import { addXp, addStress, applyWound, activeSquad, buryChar, bonus } from './chars.js';
 import { INTIM_LINES, FAREWELLS } from '../data/dialogs.js';
 import { FIRST, LAST, SCARS } from '../data/names.js';
+import { missTail, killTail, meleeMissTail } from './cronista.js';
 
 export let C = null;
 let onUpdate = () => {};
@@ -138,7 +139,7 @@ function fireShot(att, tgt, aimed) {
   const acc = hitChance(att, tgt, aimed);
 
   if (rand() * 100 > acc) {
-    clog(`${att.name} dispara a ${tgt.name}. La bala astilla madera.`);
+    clog(`${att.name} dispara a ${tgt.name}. ${missTail()}`);
     return;
   }
   const r = rint(1, 100);
@@ -154,7 +155,7 @@ function meleeHit(att, tgt) {
   let acc = bd.acc + att.sk.punteria * 0.4 - (tgt.cover ? 10 : 0) - (att.shaken ? 15 : 0);
   acc = Math.max(10, Math.min(95, acc));
   if (att.kind === 'pc') addXp(att.ch, 'reflejos', 1);
-  if (rand() * 100 > acc) { clog(`${att.name} lanza el acero. ${tgt.name} se aparta.`); return; }
+  if (rand() * 100 > acc) { clog(`${att.name} lanza el acero. ${meleeMissTail(tgt.name)}`); return; }
   hit(att, tgt, rint(bd.dmg[0], bd.dmg[1]), pick(['el costado', 'el brazo', 'el vientre']));
 }
 
@@ -177,7 +178,7 @@ function down(att, tgt) {
     tgt.dead = true;
     C.kills++;
     C.loot += rint(tgt.loot[0], tgt.loot[1]);
-    clog(`✝ ${tgt.name} cae. No se levanta.`);
+    clog(`✝ ${tgt.name} cae. ${killTail(tgt.name)}`);
     if (att.kind === 'pc') { G.stats.kills++; addStress(att.ch, 2); }
     // Moral: ver caer a los tuyos rompe a los flojos.
     const fallen = C.nFoes0 - foesAlive().length;
