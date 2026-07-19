@@ -11,6 +11,7 @@ import { G, seasonOf, yearOf } from './state.js';
 import { pick, chance, rint } from './rng.js';
 import { aliveSquad, player, ageOf } from './chars.js';
 import { GANGS, TOWNS, TOWN_ORDER } from '../data/gangs.js';
+import { FIRST, LAST } from '../data/names.js';
 
 // ---------- memoria anticontracción ----------
 function mem() { if (!G.flags.cron) G.flags.cron = []; return G.flags.cron; }
@@ -196,6 +197,125 @@ export function meleeMissTail(tgtName) {
     C('mm2', `${tgtName} lo ve venir y el acero corta aire.`),
     C('mm3', `${tgtName} baila hacia atrás. El filo pasa silbando.`)
   ]);
+}
+
+// ---------- 📰 EL COURIER: una redacción, no una lista ----------
+// El periódico tiene cuatro secciones y cada una bebe de un pozo vivo:
+// PORTADA (tus hechos), EL TERRITORIO (la época avanza año a año),
+// SUCESOS (procedurales: nombres y cifras generados — inagotable) y
+// CLASIFICADOS. La memoria anticontracción hace descansar cada tema.
+const nm = () => `${pick(FIRST)} ${pick(LAST)}`;
+const town = () => pick(TOWN_ORDER.map(id => TOWNS[id].name));
+
+export function frontPage() {
+  const cands = [];
+  const f = G.flags, p = player();
+  if (G.choices.length) {
+    const last = G.choices[G.choices.length - 1];
+    if (G.time.day - last.d < 30) cands.push(C('fp:eco', pick([
+      'RUMORES DE LA COMARCA: se comenta cierto asunto reciente que este periódico no puede publicar entero. Los implicados saben quiénes son. El Courier también.',
+      'LO QUE NO PUBLICAMOS: nuestra redacción conoce los detalles del último suceso del que todos hablan bajito. El precio de publicarlos sería conocer también al sepulturero.'
+    ])));
+  }
+  if (G.rep.fama >= 40 && p) cands.push(C('fp:fama2', pick([
+    `EL PISTOLERO DE MARROW CREEK: nuestra redacción confirma que ${p.name} existe y que las otras once cosas que cuentan de él son «probablemente exageradas».`,
+    `PREGUNTAS SIN RESPUESTA: ¿quién manda de verdad en la comarca? El juez dice que la ley. La ley dice que el juez. Los demás miran hacia donde ustedes ya saben.`
+  ])));
+  else if (G.rep.fama >= 15) cands.push(C('fp:fama1', 'UN FORASTERO PROSPERA EN MARROW CREEK: el tablón de trabajos se queda corto para cierta cuadrilla nueva. El sheriff declina comentar, que es su manera de comentar.'));
+  const wantedDone = G.once.filter(x => x.startsWith('w_')).length;
+  if (wantedDone >= 2) cands.push(C('fp:wanted', `LA LEY (AJENA) FUNCIONA: ${wantedDone} carteles de recompensa cobrados este año en la comarca. El juez de paz felicita «al sector privado».`));
+  if (G.stats.kills >= 25) cands.push(C('fp:sepult', 'EL SEPULTURERO PIDE AYUDANTE: «no doy abasto y no pienso preguntar por qué», declara.'));
+  if (f.dawsonFate === 'entregado') cands.push(C('fp:dawson', 'SILAS DAWSON, EX-PAGADOR DE LA BLACKVEIN, murió en su celda «de causas naturales». La celda era nueva. Las causas, también.'));
+  if (f.t1done >= 8) cands.push(C('fp:arroyo', 'SIGUE EL MISTERIO DEL ARROYO SECO: nadie confirma qué pasó entre las rocas, pero los forajidos del este han dejado de cantar en las cantinas.'));
+  // La guerra de facciones sale en portada.
+  const gt = gangTowns();
+  const mine = gt.filter(t => t.boss === 'player').length;
+  if (mine >= 1) cands.push(C('fp:corona', `¿UN NUEVO GREY? Fuentes de ${pick(gt).town} hablan de una mano que «ordena» ya ${mine === 1 ? 'un pueblo' : mine + ' pueblos'} de la comarca. El Courier no imprime el nombre. Por prudencia y por ortografía.`));
+  // La familia del pistolero es noticia, quiera o no.
+  if (G.family && G.family.spouse) cands.push(C('fp:boda', 'ECOS DE SOCIEDAD: cierta boda reciente sigue dando que hablar. La lista de regalos incluía, según testigos, «munición y buenos deseos, por ese orden».'));
+  if (G.family && G.family.generation > 1) cands.push(C('fp:dinastia', 'EL APELLIDO CONTINÚA: la comarca comenta el relevo en cierta casa conocida. «El potro galopa como el padre», dicen en el establo. Los acreedores ya han tomado nota.'));
+  if (!cands.length) cands.push(C('fp:calma', pick([
+    'SEMANA TRANQUILA EN EL TERRITORIO. El Courier desconfía profundamente y les recomienda hacer lo mismo.',
+    'NADA QUE DECLARAR: ni tiroteos, ni incendios, ni bodas. El director de este periódico estudia si es noticia la falta de noticias. Concluye que sí, y la cobra igual.'
+  ])));
+  return fresh(cands);
+}
+
+export function worldNews() {
+  const y = yearOf(G.time.day);
+  const era = y - G.time.startYear;
+  const cands = [];
+  // La época avanza AÑO A AÑO durante décadas: el mundo no se congela.
+  if (era <= 2) cands.push(
+    C('w:telegrafo', 'El telégrafo llegará a Marrow Creek «antes de dos inviernos», jura el agente territorial. Los cuervos ya se pelean por el sitio en el cable.'),
+    C('w:censo', `Blackvein City supera los ${12 + era} mil habitantes. Los que se fueron de aquí escriben que se come mal pero a horas fijas.`)
+  );
+  if (y === 1900) cands.push(C('w:siglo', 'UN SIGLO NUEVO: el Courier promete a sus lectores que el siglo XX será «igual de duro, pero mejor iluminado».'));
+  if (era >= 2 && era <= 5) cands.push(
+    C('w:telefono', 'Dicen que en el banco de Blackvein ya hay TELÉFONO: un cable que lleva voces. Este periódico lo ha probado. Preferimos los cuervos.'),
+    C('w:ramal', 'El ferrocarril estudia un ramal hacia el territorio. Los especuladores ya compraron hasta el polvo.')
+  );
+  if (era >= 4 && era <= 9) cands.push(
+    C('w:auto', 'PRIMER AUTOMÓVIL EN LA COMARCA: hizo el camino de Blackvein en tres horas y dos averías. Un caballo lo hace en dos y sin humillar a nadie.'),
+    C('w:luz', 'La calle mayor de Blackvein estrena luz eléctrica. Los borrachos protestan: ahora se les ve.'),
+    C('w:gramofono', 'El hotel de Redwater presume de GRAMÓFONO. La música sale de una caja. La propina, curiosamente, sigue saliendo del cliente.')
+  );
+  if (era >= 8 && era <= 14) cands.push(
+    C('w:tren2', 'El ferrocarril cruza ya el desierto entero. El Oeste que ustedes conocieron se está muriendo con elegancia.'),
+    C('w:fotos', 'Un fotógrafo ambulante cobra un dólar por retrato. Media comarca ha posado con revólver prestado. La otra media, con el suyo.'),
+    C('w:kodak', 'Llegan las cámaras «de cajón»: cualquiera puede robar un rostro en un segundo. Los buscados por la ley han presentado quejas formales.')
+  );
+  if (era >= 12) cands.push(
+    C('w:cine', 'IMÁGENES QUE SE MUEVEN: en Blackvein proyectan «fotografías vivas» sobre una sábana. Vimos un tren acercarse y media sala desenfundó. El siglo promete.'),
+    C('w:oeste_muere', 'Un periodista del este busca «al último pistolero de verdad» para su libro. La comarca entera se ha ofrecido. El libro será gordo y mentiroso.')
+  );
+  // La compañía, el río, la estación: el fondo que nunca descansa.
+  cands.push(
+    C('w:blackvein', 'LA BLACKVEIN MINING COMUNICA: «Los rumores sobre la compañía son infundados.» No especifica cuáles. Todos, se entiende.'),
+    C('w:jornales', `La Blackvein ${chance(0.5) ? 'baja' : 'congela'} los jornales «por responsabilidad». Los mineros estudian responder con la suya.`),
+    C('w:rio', `El río ${chance(0.5) ? 'baja crecido y se ha llevado el vado de Redwater' : 'trae barcazas nuevas que nadie ha visto cargar de día'}. La Reina Sable, sin comentarios.`),
+    C('w:eleccion', `${town()} ${chance(0.5) ? 'elige juez de paz' : 'busca sheriff'}: se presentan dos candidatos y una escopeta. Hay quinielas.`)
+  );
+  if (winter()) cands.push(C('w:invierno', 'PARTE DE NIEVES: el paso del norte, cerrado. El Courier recuerda que la leña sube y la paciencia baja: hagan acopio de ambas.'));
+  if (season() === 'Verano') cands.push(C('w:sequia', 'La sequía aprieta: el juez ha prohibido los duelos cerca del aljibe «por higiene». La higiene, señores, por fin sirve para algo.'));
+  return fresh(cands);
+}
+
+export function sucesos() {
+  // Nombres y cifras generados: esta sección no se agota jamás.
+  const a = nm(), b = nm(), t = town(), d = rint(2, 60);
+  const cands = [
+    C('s:mula', `${a} denuncia el robo de su mula en ${t}. La mula volvió sola dos días después. ${a.split(' ')[0]} retira la denuncia y pide disculpas «a la interesada».`),
+    C('s:reyerta', `Reyerta en la cantina de ${t}: ${a} y ${b} discutieron por una mano de póker de $${d}. Ganó la casa, como siempre: ambos pagaron los desperfectos.`),
+    C('s:boda2', `${a} y ${b} anuncian compromiso. Las familias, preguntadas por este periódico, respondieron cargando. Habrá boda o habrá crónica de sucesos: tenemos tinta para ambas.`),
+    C('s:pepita', `${a} asegura haber hallado una pepita «del tamaño de un huevo» en el arroyo. Desde entonces tiene ${rint(3, 9)} nuevos mejores amigos y ningún huevo que enseñar.`),
+    C('s:fuga', `Se fugó un preso del calabozo de ${t}. El sheriff pide calma y una cerradura nueva. El preso, según testigos, pidió perdón al salir. Aquí se educa hasta al delincuente.`),
+    C('s:sermon', `El reverendo de Bent Fork batió su marca: sermón de ${rint(2, 4)} horas sobre la paciencia. La congregación demostró tenerla.`),
+    C('s:pozo', `${a} cayó al pozo de ${t} y fue rescatado con ayuda de ${b} y de una soga «que ya estaba ahí para otra cosa». Este periódico no hará más preguntas.`),
+    C('s:duelo_no', `Duelo anunciado y suspendido en ${t}: ${a} y ${b} se batieron a insultos y empataron. El público pidió que devolvieran la entrada. No había entrada. La pidieron igual.`),
+    C('s:oso', `${a} jura haber visto «un oso del tamaño de un carro» en el camino alto. El tamaño del oso crece un palmo por cantina. Ya va por dos carros.`),
+    C('s:herencia', `Leído el testamento de un vecino de ${t}: deja ${rint(20, 200)} dólares, dos rifles y una lista de nombres «para que mi familia sepa a quién no fiarse». La lista era larga y salía barata: media comarca.`)
+  ];
+  return fresh(cands);
+}
+
+export function classified() {
+  const a = nm(), d = rint(1, 12);
+  const cands = [
+    C('c:mula2', 'SE VENDE: mula tuerta, ve la mitad, trabaja el doble. Preguntar por Amos en el establo.'),
+    C('c:dientes', 'PERDIDO: dentadura postiza en la pelea del sábado. Recompensa: la otra mitad de la pelea.'),
+    C('c:hija', 'La Sra. Fairbanks recuerda a los caballeros que su hija NO está en edad de merecer. La escopeta de la Sra. Fairbanks opina igual.'),
+    C('c:letras', 'CLASES DE LECTURA los domingos. Los que firman con una X, media tarifa.'),
+    C('c:sanguijuelas', 'El barbero informa: las sanguijuelas nuevas llegaron. Las viejas, en paz descansen, dieron todo.'),
+    C('c:banjo', 'CAMBIO: banjo casi afinado por escopeta en cualquier estado. Urge, por votación de mis vecinos.'),
+    C('c:sepult2', 'El sepulturero comunica que los adelantos no son mal fario, sino previsión. Descuentos por familia.'),
+    C('c:botas', `SE VENDEN botas de caballero, un solo dueño, apenas usadas de rodillas. Razón: ${a}.`),
+    C('c:carta', `${a} ruega a quien encontró cierta carta el sábado que la devuelva SIN LEER. Dobla la recompensa si además la olvida.`),
+    C('c:reloj', `EMPEÑO: reloj de plata que da las horas «aproximadamente». $${d}. Historia sentimental incluida sin coste.`),
+    C('c:tonico', `El TÓNICO MILAGROSO del Dr. Pemberton cura ${rint(7, 24)} males distintos. El doctor no especifica cuáles ni conviene preguntárselo de cerca.`),
+    C('c:gato', 'ENCONTRADO: gato atigrado que no es de nadie y come como si fuera de todos. Se queda quien lo aguante.')
+  ];
+  return fresh(cands);
 }
 
 // ---------- ⚔ GUERRA: cada represalia con su propia cara ----------

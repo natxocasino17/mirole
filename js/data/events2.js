@@ -9,58 +9,24 @@ import { GANGS } from './gangs.js';
 import { introduce, breakup } from '../engine/hearts.js';
 import { firstName } from './people.js';
 import { eldestHeir, doTraspaso, childAge } from '../engine/family.js';
-import { warFlavor } from '../engine/cronista.js';
+import { warFlavor, frontPage, worldNews, sucesos, classified } from '../engine/cronista.js';
 import * as CB from '../engine/combat.js';
 
 const bondKey = (a, b) => `${Math.min(a, b)}-${Math.max(a, b)}`;
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
-// ---------- el periódico: tu leyenda, mal escrita por otros ----------
-const CLASSIFIEDS = [
-  'SE VENDE: mula tuerta, ve la mitad, trabaja el doble. Preguntar por Amos en el establo.',
-  'PERDIDO: dentadura postiza en la pelea del sábado. Recompensa: la otra mitad de la pelea.',
-  'La Sra. Fairbanks recuerda a los caballeros que su hija NO está en edad de merecer. La escopeta de la Sra. Fairbanks opina igual.',
-  'CLASES DE LECTURA los domingos. Los que firman con una X, media tarifa.',
-  'El barbero informa: las sanguijuelas nuevas llegaron. Las viejas, en paz descansen, dieron todo.',
-  'CAMBIO: banjo casi afinado por escopeta en cualquier estado. Urge, por votación de mis vecinos.',
-  'El sepulturero comunica que los adelantos no son mal fario, sino previsión. Descuentos por familia.'
-];
-const ERA_NEWS = {
-  1899: ['El telégrafo llegará a Marrow Creek «antes de dos inviernos», jura el agente territorial. Los cuervos ya se pelean por el sitio en el cable.',
-         'Blackvein City supera los doce mil habitantes. Los que se fueron de aquí escriben que se come mal pero a horas fijas.'],
-  1900: ['UN SIGLO NUEVO: el Courier promete a sus lectores que el siglo XX será «igual de duro, pero mejor iluminado».',
-         'La Blackvein Mining anuncia «un año de prosperidad compartida». El Courier no ha sabido confirmar con quién la comparte.'],
-  1901: ['Dicen que en el este ya hay carruajes SIN CABALLO. Este periódico se niega a publicar semejante borrachera... pero lo publica, por si acaso.',
-         'El ferrocarril estudia un ramal hacia el territorio. Los especuladores ya compraron hasta el polvo.']
-};
-
-function paperHeadline() {
-  const lines = [];
-  const f = G.flags;
-  if (f.t1done >= 8) lines.push('SIGUE EL MISTERIO DEL ARROYO SECO: nadie confirma qué pasó entre las rocas, pero los forajidos del este han dejado de cantar en las cantinas.');
-  if (G.rep.fama >= 40) lines.push(`EL PISTOLERO DE MARROW CREEK: nuestra redacción confirma que ${player().name} existe y que las otras once cosas que cuentan de él son «probablemente exageradas».`);
-  else if (G.rep.fama >= 15) lines.push('UN FORASTERO PROSPERA EN MARROW CREEK: el tablón de trabajos se queda corto para cierta cuadrilla nueva. El sheriff declina comentar, que es su manera de comentar.');
-  const wantedDone = G.once.filter(x => x.startsWith('w_')).length;
-  if (wantedDone >= 2) lines.push(`LA LEY (AJENA) FUNCIONA: ${wantedDone} carteles de recompensa cobrados este año en la comarca. El juez de paz felicita «al sector privado».`);
-  if (G.stats.kills >= 25) lines.push('EL SEPULTURERO PIDE AYUDANTE: «no doy abasto y no pienso preguntar por qué», declara.');
-  if (f.dawsonFate === 'entregado') lines.push('SILAS DAWSON, EX-PAGADOR DE LA BLACKVEIN, murió en su celda «de causas naturales». La celda era nueva. Las causas, también.');
-  if (G.choices.length) {
-    const last = G.choices[G.choices.length - 1];
-    if (G.time.day - last.d < 30) lines.push('RUMORES DE LA COMARCA: se comenta cierto asunto reciente que este periódico no puede publicar entero. Los implicados saben quiénes son. El Courier también.');
-  }
-  if (!lines.length) lines.push('SEMANA TRANQUILA EN EL TERRITORIO. El Courier desconfía profundamente y les recomienda hacer lo mismo.');
-  return pick(lines);
-}
-
+// El periódico vive ahora en el Cronista (frontPage/worldNews/sucesos/
+// classified): cada número sale distinto y habla de TU partida.
 export const EVENTS2 = {
 
   periodico: {
     build() {
-      const y = yearOf(G.time.day);
-      const era = ERA_NEWS[y] || ['El territorio sigue girando. Despacio, como todo lo que dura.'];
+      // Cuatro secciones vivas: portada (tus hechos), el territorio (la
+      // época avanza), sucesos (procedurales) y clasificados. Cada número
+      // sale distinto: la redacción es el Cronista.
       return {
         title: `📰 The Marrow Creek Courier`,
-        text: `${dateStr()} · Dos centavos, y los vale casi siempre.\n\n★ ${paperHeadline()}\n\n★ ${pick(era)}\n\n★ LA BLACKVEIN MINING COMUNICA: «Los rumores sobre la compañía son infundados.» No especifica cuáles. Todos, se entiende.\n\n★ CLASIFICADOS: ${pick(CLASSIFIEDS)}`,
+        text: `${dateStr()} · Dos centavos, y los vale casi siempre.\n\n★ ${frontPage()}\n\n★ EL TERRITORIO: ${worldNews()}\n\n★ SUCESOS: ${sucesos()}\n\n★ CLASIFICADOS: ${classified()}`,
         opts: [{ t: 'Doblar el periódico', fx() {
             addStress(player(), -3);
             return null;
