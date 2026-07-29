@@ -17,6 +17,7 @@ import * as EMP from '../engine/empire.js';
 import * as HEARTS from '../engine/hearts.js';
 import * as FAM from '../engine/family.js';
 import * as CRON from '../engine/cronista.js';
+import * as TR from '../engine/tramas.js';
 import { TOWNS, GANGS, TOWN_ORDER } from '../data/gangs.js';
 import { WEAPONS, GOODS, ROPA, UPGRADES, HORSES, SHOP_ALMACEN, SHOP_ARMERO, SHOP_SASTRE,
          mkWeapon, mkGood, mkRopa, itemName, itemDef, effAcc, effMag, effJam, effDurMax } from '../data/items.js';
@@ -272,7 +273,9 @@ function cantina() {
   const galleraOpen = dow === 3 || dow === 6;         // gallera: miércoles y sábado
   const roseOpen = dow === 0 || dow === 2 || dow === 5; // el piso: domingo, martes, viernes
   const rangeOpen = dow === 1 || dow === 4;            // práctica: lunes y jueves
-  let html = `<h2>«EL CUERVO» — Marrow Creek</h2><div class="flavor">${DOW[dow]}. ${mood}</div><div class="grid">`;
+  let html = `<h2>«EL CUERVO» — Marrow Creek</h2><div class="flavor">${DOW[dow]}. ${mood}</div>`;
+  html += hiloPanel();
+  html += `<div class="grid">`;
   const tired = (g.daily.energy || 0) <= energyMax() * 0.3;
   html += `<button data-a="rest" ${tired ? 'class="special"' : ''}>🛏️ Descansar<br><span class="dim small">${tired ? 'Estás molido. Duerme y recupera la cuerda.' : `Dormir hasta mañana. Cura y calma. ⚡${g.daily.energy}`}</span></button>`;
   html += `<button data-a="whisky" ${g.daily.whisky >= 3 || g.money < 3 ? 'disabled' : ''}>🥃 Whisky ($3)<br><span class="dim small">−12 estrés. ${3 - g.daily.whisky} restantes hoy.</span></button>`;
@@ -297,6 +300,29 @@ function cantina() {
   if (pk) { renderPoker(); return; }
   $('screen').innerHTML = html;
   $('screen').querySelectorAll('button[data-a]').forEach(b => b.onclick = () => cantinaAct(b.dataset));
+  $('screen').querySelectorAll('button[data-hilo]').forEach(b => b.onclick = () => {
+    const sc = EVENTS.trama.build(b.dataset.hilo);
+    if (sc) showScene(sc, () => {}); else renderAll();
+  });
+}
+
+// ⏳ EL HILO: lo que te persigue, siempre a la vista y con reloj.
+// Va arriba del todo a propósito: antes que el whisky y el póker, el
+// juego te recuerda qué está en juego HOY.
+function hiloPanel() {
+  const ts = TR.tramasOrdenadas();
+  if (!ts.length) return '';
+  let h = `<h3>⏳ El hilo</h3>`;
+  for (const t of ts.slice(0, 3)) {
+    const d = TR.diasPara(t);
+    const urg = d <= 1 ? 'red' : d <= 3 ? 'amber' : 'dim';
+    const cuando = d <= 0 ? 'VENCIDO' : d === 1 ? 'mañana' : `${d} días`;
+    h += `<div class="card"><div class="row">
+      <span><b>${t.title}</b><br><span class="small dim">${t.stakes}</span></span>
+      <span class="${urg}" style="text-align:right;white-space:nowrap">⏳ ${cuando}</span></div>
+      <div class="row"><button data-hilo="${t.id}">Atender</button></div></div>`;
+  }
+  return h;
 }
 
 function cantinaAct(d) {

@@ -10,10 +10,15 @@ import { pickSideQuest } from '../data/sidequests.js';
 import { tomo1Check } from '../data/tomo1.js';
 import { ensureTerritory, empireUnlocked, drift } from './empire.js';
 import { ensureHearts, shouldIntroduce, heartsTick } from './hearts.js';
+import { tramasTick } from './tramas.js';
 
 export function dailyTick() {
   const p = player();
   if (!p) return;
+
+  // ⏳ LAS TRAMAS primero: la presión manda sobre el resto del día.
+  // Lo que te persigue tiene prioridad sobre lo que te entretiene.
+  tramasTick();
 
   // La novela avanza: ¿toca capítulo nuevo?
   tomo1Check();

@@ -556,3 +556,7 @@ function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 // «El mundo te recuerda»: periódico, sueños, aniversarios, fogata, némesis.
 import { EVENTS2 } from './events2.js';
 Object.assign(EVENTS, EVENTS2);
+
+// LAS TRAMAS: los hilos abiertos con reloj. La presión del juego.
+import { TRAMAS_EV } from './tramas_ev.js';
+Object.assign(EVENTS, TRAMAS_EV);

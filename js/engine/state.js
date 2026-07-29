@@ -5,7 +5,7 @@
 import { seedRng, rngState, setRngState } from './rng.js';
 
 export const SCHEMA = 6;
-export const VERSION = '0.12.1';
+export const VERSION = '0.13.0';
 const KEY = 'mirole_save';
 
 export let G = null;
@@ -26,6 +26,7 @@ export function baseState() {
     sideOffer: null, sideDay: -99,
     choices: [],
     bonds: {}, nemeses: [], relations: {}, territory: null,
+    tramas: [],
     family: { spouse: null, children: [], generation: 1 },
     daily: { day: 0, energy: 100, whisky: 0, talks: [], clean: false, rumor: false, pet: false },
     pets: [], horse: null,
